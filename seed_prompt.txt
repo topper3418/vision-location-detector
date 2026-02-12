@@ -1,0 +1,22 @@
+This application will use aiohttp to stream camera footage to a webpage.
+
+It will use yolo to detect any people that may be in the frame. 
+This is for the Nvidia Jetson Orin Nano hardware, so use accelerators.
+
+The application will also print out on screen a list of detected people, 
+with their approximate location being displayed. 
+
+The camera will be angled downward by 45 degrees, in order to properly 
+see the floor. 
+
+
+Dev rules: 
+All functions must come with a unit test in the "test/unit" directory.
+all functions that import from other packages must be given mocking and 
+un-mocking integration tests.
+all source code goes in the src/ directory
+all files related to running on a server (nginx, systemd, etc) must be 
+in the server/ directory
+any module that exceeds 250 lines must be refactored into a package
+Use object-oriented patterns
+One class per module

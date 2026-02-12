@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision Location Detector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            color: #16c79a;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .subtitle {
+            font-size: 1.1em;
+            color: #aaa;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+        }
+        
+        .video-section {
+            background: #0f3460;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+        
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        
+        #videoStream {
+            width: 100%;
+            height: auto;
+            display: block;
+            min-height: 480px;
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16c79a;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .status-text {
+            font-size: 0.95em;
+            color: #ccc;
+        }
+        
+        .info-section {
+            background: #0f3460;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+        
+        .info-section h2 {
+            color: #16c79a;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .info-content {
+            color: #ccc;
+            line-height: 1.8;
+        }
+        
+        .info-content p {
+            margin-bottom: 10px;
+        }
+        
+        .camera-angle {
+            background: rgba(22, 199, 154, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #16c79a;
+            margin-top: 10px;
+        }
+        
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .subtitle {
+                font-size: 0.95em;
+            }
+            
+            #videoStream {
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Vision Location Detector</h1>
+        <p class="subtitle">Real-time Camera Feed Monitoring</p>
+    </header>
+    
+    <div class="container">
+        <div class="video-section">
+            <div class="video-wrapper">
+                <img id="videoStream" src="/stream" alt="Video Stream">
+            </div>
+            <div class="status">
+                <div class="status-indicator"></div>
+                <span class="status-text">Live Feed Active</span>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h2>System Information</h2>
+            <div class="info-content">
+                <p><strong>Platform:</strong> Nvidia Jetson Orin Nano</p>
+                <p><strong>Stream Format:</strong> MJPEG (Motion JPEG)</p>
+                <p><strong>Frame Rate:</strong> ~30 FPS</p>
+                <div class="camera-angle">
+                    <p><strong>Camera Angle:</strong> 45° downward for optimal floor coverage</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Vision Location Detector &copy; 2026 | Powered by aiohttp and OpenCV</p>
+    </footer>
+</body>
+</html>
