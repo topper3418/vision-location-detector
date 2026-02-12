@@ -49,7 +49,6 @@ class TestCameraIntegration(unittest.TestCase):
         # Setup mocks
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
-        mock_cap.grab.return_value = True
         test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         mock_cap.read.return_value = (True, test_frame)
         mock_video_capture.return_value = mock_cap
@@ -61,18 +60,15 @@ class TestCameraIntegration(unittest.TestCase):
         camera = CameraCapture()
         self.assertTrue(camera.initialize())
         
+        # Verify buffer size was set to 1
+        mock_cap.set.assert_any_call(38, 1)  # CAP_PROP_BUFFERSIZE = 38
+        
         success, frame = camera.read_frame()
         self.assertTrue(success)
         self.assertIsNotNone(frame)
         
-        # Verify buffer was flushed
-        self.assertEqual(mock_cap.grab.call_count, 4)
-        
         jpeg_data = camera.get_jpeg_frame()
         self.assertIsNotNone(jpeg_data)
-        
-        # Verify buffer was flushed again for second read
-        self.assertEqual(mock_cap.grab.call_count, 8)
         
         camera.release()
         self.assertIsNone(camera.capture)
@@ -152,34 +148,23 @@ class TestCameraIntegration(unittest.TestCase):
         self.assertFalse(camera.is_opened())
     
     @patch('cv2.VideoCapture')
-    def test_buffer_flush_for_latest_frame_mocked(self, mock_video_capture):
-        """Test that buffer flushing ensures latest frame for YOLO detection."""
+    def test_buffer_size_for_latest_frame_mocked(self, mock_video_capture):
+        """Test that buffer size is set to 1 for latest frame (YOLO optimization)."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
-        
-        # Simulate buffer with old frames that get discarded via grab()
-        mock_cap.grab.return_value = True
-        
-        # Latest frame after buffer flush
-        latest_frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-        mock_cap.read.return_value = (True, latest_frame)
         mock_video_capture.return_value = mock_cap
         
         camera = CameraCapture()
         camera.initialize()
         
-        # First read
-        success, frame = camera.read_frame()
-        self.assertTrue(success)
+        # Verify CAP_PROP_BUFFERSIZE (38) is set to 1
+        # This ensures we always get the latest frame, not buffered old frames
+        mock_cap.set.assert_any_call(38, 1)
         
-        # Verify buffer flush happened (4 grabs + 1 read)
-        self.assertEqual(mock_cap.grab.call_count, 4)
-        self.assertEqual(mock_cap.read.call_count, 1)
-        
-        # Second read should flush buffer again
-        success, frame = camera.read_frame()
-        self.assertEqual(mock_cap.grab.call_count, 8)  # 4 more grabs
-        self.assertEqual(mock_cap.read.call_count, 2)  # 1 more read
+        # Verify it was set during initialization
+        set_calls = [call for call in mock_cap.set.call_args_list if call[0][0] == 38]
+        self.assertEqual(len(set_calls), 1)
+        self.assertEqual(set_calls[0][0][1], 1)
 
 
 if __name__ == '__main__':

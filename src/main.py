@@ -55,7 +55,11 @@ class Application:
         """Initialize the web server."""
         self.logger.info(f"Initializing web server on {self.host}:{self.port}...")
         self.server = WebServer(host=self.host, port=self.port)
-        self.server.set_camera(self.camera)
+        
+        # Type narrowing: ensure camera was initialized
+        if self.camera is not None:
+            self.server.set_camera(self.camera)
+        
         self.logger.info("Web server initialized")
     
     def run(self) -> int:
@@ -71,6 +75,11 @@ class Application:
             
             # Initialize server
             self.initialize_server()
+            
+            # Start server (type narrowing check)
+            if self.server is None:
+                self.logger.error("Server not initialized")
+                return 1
             
             # Start server
             self.logger.info("Starting application...")

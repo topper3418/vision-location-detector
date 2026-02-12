@@ -40,18 +40,21 @@ class CameraCapture:
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         
+        # Set buffer size to 1 to always get the latest frame (critical for YOLO)
+        # This prevents processing stale frames when detection is slower than capture rate
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 5)
+        
         # Enable hardware acceleration for Jetson
         self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # type: ignore[attr-defined]
         
         return True
     
     def read_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """Read the most recent frame from the camera.
+        """Read the latest frame from the camera.
         
-        This method flushes the camera buffer to ensure we get the latest
-        frame, which is critical for real-time object detection (YOLO).
-        This prevents processing stale frames when detection is slower
-        than the camera's capture rate.
+        With CAP_PROP_BUFFERSIZE set to 1 during initialization,
+        this always returns the most recent frame, which is critical
+        for real-time object detection (YOLO).
         
         Returns:
             Tuple of (success, frame) where success is a boolean
@@ -59,13 +62,7 @@ class CameraCapture:
         """
         if self.capture is None or not self.capture.isOpened():
             return False, None
-        
-        # Flush buffer by grabbing frames without decoding (fast operation)
-        # This ensures we get the most recent frame, not a buffered old one
-        for _ in range(4):
-            self.capture.grab()
             
-        # Now read and decode the latest frame
         success, frame = self.capture.read()
         return success, frame
     

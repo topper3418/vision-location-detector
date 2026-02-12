@@ -39,8 +39,10 @@ class TestCameraCapture(unittest.TestCase):
         
         self.assertTrue(result)
         mock_video_capture.assert_called_once_with(0)
+        # Verify resolution and buffer size are set
         mock_cap.set.assert_any_call(3, 640)  # CAP_PROP_FRAME_WIDTH = 3
         mock_cap.set.assert_any_call(4, 480)  # CAP_PROP_FRAME_HEIGHT = 4
+        mock_cap.set.assert_any_call(38, 1)   # CAP_PROP_BUFFERSIZE = 38
     
     @patch('cv2.VideoCapture')
     def test_initialize_failure(self, mock_video_capture):
@@ -62,7 +64,7 @@ class TestCameraCapture(unittest.TestCase):
     
     @patch('cv2.VideoCapture')
     def test_read_frame_success(self, mock_video_capture):
-        """Test successful frame reading with buffer flush."""
+        """Test successful frame reading."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
         test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -75,9 +77,6 @@ class TestCameraCapture(unittest.TestCase):
         self.assertTrue(success)
         self.assertIsNotNone(frame)
         np.testing.assert_array_equal(frame, test_frame)
-        
-        # Verify buffer was flushed (grab called 4 times)
-        self.assertEqual(mock_cap.grab.call_count, 4)
         mock_cap.read.assert_called_once()
     
     @patch('cv2.VideoCapture')
@@ -95,25 +94,16 @@ class TestCameraCapture(unittest.TestCase):
         self.assertIsNone(frame)
     
     @patch('cv2.VideoCapture')
-    def test_read_frame_buffer_flush(self, mock_video_capture):
-        """Test that buffer is flushed to get latest frame."""
+    def test_buffer_size_set_for_latest_frame(self, mock_video_capture):
+        """Test that buffer size is set to 1 for latest frame retrieval."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
-        test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        mock_cap.read.return_value = (True, test_frame)
-        mock_cap.grab.return_value = True
         mock_video_capture.return_value = mock_cap
         
         self.camera.initialize()
         
-        # Read a frame
-        success, frame = self.camera.read_frame()
-        
-        # Verify grab was called exactly 4 times to flush buffer
-        self.assertEqual(mock_cap.grab.call_count, 4)
-        # Verify read was called once after flushing
-        mock_cap.read.assert_called_once()
-        self.assertTrue(success)
+        # Verify CAP_PROP_BUFFERSIZE (38) is set to 1
+        mock_cap.set.assert_any_call(38, 1)
     
     def test_get_jpeg_frame_no_capture(self):
         """Test getting JPEG frame when camera not initialized."""
