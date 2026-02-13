@@ -39,11 +39,135 @@
             color: #aaa;
         }
         
+        .settings-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #16c79a;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+        
+        .settings-btn:hover {
+            background: #13a87e;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal-content {
+            background: #0f3460;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #16c79a;
+            padding-bottom: 15px;
+        }
+        
+        .modal-header h2 {
+            color: #16c79a;
+            margin: 0;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.3s;
+        }
+        
+        .close:hover {
+            color: #fff;
+        }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .setting-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #16c79a;
+        }
+        
+        .setting-label {
+            color: #888;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        
+        .setting-value {
+            color: #fff;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        
+        .setting-value.true {
+            color: #16c79a;
+        }
+        
+        .setting-value.false {
+            color: #ff6b6b;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
         .container {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             gap: 20px;
-            max-width: 1400px;
+            max-width: 1800px;
             width: 100%;
         }
         
@@ -52,6 +176,16 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            flex: 2;
+            min-width: 0;
+        }
+        
+        .data-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 350px;
         }
         
         .video-wrapper {
@@ -86,6 +220,16 @@
             border-radius: 50%;
             background: #16c79a;
             animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.inactive {
+            background: #ff6b6b;
+            animation: none;
+        }
+        
+        .status-indicator.connecting {
+            background: #f9ca24;
+            animation: pulse 1s infinite;
         }
         
         @keyframes pulse {
@@ -124,19 +268,21 @@
             margin-bottom: 10px;
         }
         
-        .camera-angle {
-            background: rgba(22, 199, 154, 0.1);
-            padding: 10px;
-            border-radius: 6px;
-            border-left: 3px solid #16c79a;
-            margin-top: 10px;
-        }
-        
         footer {
             margin-top: 40px;
             text-align: center;
             color: #666;
             font-size: 0.9em;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .data-section {
+                min-width: 0;
+            }
         }
         
         @media (max-width: 768px) {
@@ -151,10 +297,36 @@
             #videoStream {
                 min-height: 300px;
             }
+            
+            .settings-btn {
+                top: 10px;
+                right: 10px;
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
+            
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
+    <button class="settings-btn" id="settingsBtn">⚙️ Settings</button>
+    
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>System Settings</h2>
+                <span class="close" id="closeModal">&times;</span>
+            </div>
+            <div class="settings-grid" id="settingsGrid">
+                <p style="grid-column: 1 / -1; color: #888; text-align: center;">Loading settings...</p>
+            </div>
+        </div>
+    </div>
+    
     <header>
         <h1>Vision Location Detector</h1>
         <p class="subtitle">Real-time Camera Feed Monitoring</p>
@@ -166,19 +338,26 @@
                 <img id="videoStream" src="/stream" alt="Video Stream">
             </div>
             <div class="status">
-                <div class="status-indicator"></div>
-                <span class="status-text">Live Feed Active</span>
+                <div class="status-indicator connecting" id="statusIndicator"></div>
+                <span class="status-text" id="statusText">Connecting...</span>
             </div>
         </div>
         
-        <div class="info-section">
-            <h2>System Information</h2>
-            <div class="info-content">
-                <p><strong>Platform:</strong> Nvidia Jetson Orin Nano</p>
-                <p><strong>Stream Format:</strong> MJPEG (Motion JPEG)</p>
-                <p><strong>Frame Rate:</strong> ~30 FPS</p>
-                <div class="camera-angle">
-                    <p><strong>Camera Angle:</strong> 45° downward for optimal floor coverage</p>
+        <div class="data-section">
+            <div class="info-section">
+                <h2>System Information</h2>
+                <div class="info-content">
+                    <p><strong>Platform:</strong> Nvidia Jetson Orin Nano</p>
+                    <p><strong>Stream Format:</strong> MJPEG (Motion JPEG)</p>
+                    <p><strong>Frame Rate:</strong> <span id="fpsDisplay">-- FPS</span></p>
+                </div>
+            </div>
+            
+            <div class="info-section">
+                <h2>Detected Pedestrians</h2>
+                <div id="detectionsContainer" class="info-content">
+                    <p id="detectionCount">No detections yet...</p>
+                    <div id="detectionsList"></div>
                 </div>
             </div>
         </div>
@@ -187,5 +366,207 @@
     <footer>
         <p>Vision Location Detector &copy; 2026 | Powered by aiohttp and OpenCV</p>
     </footer>
+    
+    <script>
+        // Settings Modal functionality
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeModal = document.getElementById('closeModal');
+        const settingsGrid = document.getElementById('settingsGrid');
+        
+        // Open modal
+        settingsBtn.onclick = function() {
+            settingsModal.style.display = 'block';
+            loadSettings();
+        }
+        
+        // Close modal
+        closeModal.onclick = function() {
+            settingsModal.style.display = 'none';
+        }
+        
+        // Close when clicking outside
+        window.onclick = function(event) {
+            if (event.target == settingsModal) {
+                settingsModal.style.display = 'none';
+            }
+        }
+        
+        // Load and display settings
+        async function loadSettings() {
+            try {
+                const response = await fetch('/settings');
+                const settings = await response.json();
+                
+                displaySettings(settings);
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                settingsGrid.innerHTML = '<p style="grid-column: 1 / -1; color: #ff6b6b; text-align: center;">Failed to load settings</p>';
+            }
+        }
+        
+        function displaySettings(settings) {
+            const settingsMap = {
+                'Device': settings.device,
+                'YOLO Enabled': settings.enable_yolo,
+                'TensorRT': settings.use_tensorrt,
+                'Model Path': settings.yolo_model_path,
+                'Confidence': `${(settings.confidence_threshold * 100).toFixed(0)}%`,
+                'Camera ID': settings.camera_id,
+                'Resolution': `${settings.camera_width}x${settings.camera_height}`,
+                'Server': `${settings.server_host}:${settings.server_port}`,
+                'JPEG Quality': settings.jpeg_quality
+            };
+            
+            let html = '';
+            for (const [label, value] of Object.entries(settingsMap)) {
+                let valueClass = '';
+                let displayValue = value;
+                
+                if (typeof value === 'boolean') {
+                    valueClass = value ? 'true' : 'false';
+                    displayValue = value ? '✓ Enabled' : '✗ Disabled';
+                }
+                
+                html += `
+                    <div class="setting-item">
+                        <div class="setting-label">${label}</div>
+                        <div class="setting-value ${valueClass}">${displayValue}</div>
+                    </div>
+                `;
+            }
+            
+            settingsGrid.innerHTML = html;
+        }
+        
+        // Monitor video stream status
+        const videoStream = document.getElementById('videoStream');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        let streamActive = false;
+        let fpsCheckCount = 0;
+        
+        // Update stream status display
+        function updateStreamStatus(isActive) {
+            streamActive = isActive;
+            if (isActive) {
+                statusIndicator.className = 'status-indicator';
+                statusText.textContent = 'Live Feed Active';
+            } else {
+                statusIndicator.className = 'status-indicator inactive';
+                statusText.textContent = 'Feed Disconnected';
+            }
+        }
+        
+        // Check if stream image is loading
+        videoStream.addEventListener('error', () => {
+            console.error('Video stream error');
+            updateStreamStatus(false);
+        });
+        
+        // Set initial status as connecting
+        statusIndicator.className = 'status-indicator connecting';
+        statusText.textContent = 'Connecting...';
+        
+        // Fetch FPS data periodically
+        async function updateFPS() {
+            try {
+                const response = await fetch('/fps');
+                const data = await response.json();
+                
+                const fpsEl = document.getElementById('fpsDisplay');
+                if (data.fps > 0) {
+                    fpsEl.textContent = `${data.fps.toFixed(1)} FPS`;
+                    fpsEl.style.color = '#16c79a';
+                    fpsEl.style.fontWeight = 'bold';
+                    
+                    // If we're getting FPS, the stream is active
+                    updateStreamStatus(true);
+                    fpsCheckCount = 0;
+                } else {
+                    fpsCheckCount++;
+                    if (fpsCheckCount > 3) {
+                        // No FPS for 3+ seconds, stream might be inactive
+                        fpsEl.textContent = 'Waiting for stream...';
+                        fpsEl.style.color = '#888';
+                        updateStreamStatus(false);
+                    } else {
+                        fpsEl.textContent = 'Starting...';
+                        fpsEl.style.color = '#888';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching FPS:', error);
+            }
+        }
+        
+        // Fetch detection data periodically
+        async function updateDetections() {
+            try {
+                const response = await fetch('/detections');
+                const data = await response.json();
+                
+                updateDetectionsDisplay(data);
+            } catch (error) {
+                console.error('Error fetching detections:', error);
+                // Show error state
+                const countEl = document.getElementById('detectionCount');
+                countEl.textContent = 'Detection system offline';
+                countEl.style.color = '#ff6b6b';
+            }
+        }
+        
+        // Update the detection display
+        function updateDetectionsDisplay(data) {
+            const countEl = document.getElementById('detectionCount');
+            const listEl = document.getElementById('detectionsList');
+            
+            // Check if YOLO is enabled by seeing if we have the enabled flag
+            if (data.enabled === false) {
+                countEl.textContent = '⚠️ Pedestrian detection disabled (ENABLE_YOLO=false)';
+                countEl.style.color = '#f9ca24';
+                countEl.style.fontSize = '0.95em';
+                listEl.innerHTML = '<p style="color: #aaa; margin-top: 10px; font-size: 0.9em;">Enable YOLO in .env to see detections</p>';
+                return;
+            }
+            
+            if (data.count === 0) {
+                countEl.textContent = 'No pedestrians detected';
+                countEl.style.color = '#888';
+                countEl.style.fontSize = '1em';
+                listEl.innerHTML = '';
+            } else {
+                countEl.textContent = `${data.count} person${data.count > 1 ? 's' : ''} detected`;
+                countEl.style.color = '#16c79a';
+                countEl.style.fontWeight = 'bold';
+                countEl.style.fontSize = '1em';
+                
+                // Build detection list
+                let html = '<div style="margin-top: 15px;">';
+                data.detections.forEach((det, idx) => {
+                    html += `
+                        <div style="background: rgba(22, 199, 154, 0.1); padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #16c79a;">
+                            <p style="margin-bottom: 5px;"><strong>Person ${idx + 1}</strong></p>
+                            <p style="font-size: 0.9em; color: #ccc;">Location: <strong>${det.location}</strong></p>
+                            <p style="font-size: 0.9em; color: #ccc;">Confidence: <strong>${(det.confidence * 100).toFixed(1)}%</strong></p>
+                            <p style="font-size: 0.85em; color: #999;">BBox: (${Math.round(det.bbox.x1)}, ${Math.round(det.bbox.y1)}) to (${Math.round(det.bbox.x2)}, ${Math.round(det.bbox.y2)})</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                listEl.innerHTML = html;
+            }
+        }
+        
+        // Update detections every 500ms
+        setInterval(updateDetections, 500);
+        
+        // Update FPS every 1000ms (once per second)
+        setInterval(updateFPS, 1000);
+        
+        // Initial updates
+        updateDetections();
+        updateFPS();
+    </script>
 </body>
 </html>

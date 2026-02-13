@@ -8,6 +8,7 @@ from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 from src.server import WebServer
 from src.camera import CameraCapture
+from src.detector import PedestrianDetector
 
 
 class TestWebServer(unittest.TestCase):
@@ -23,6 +24,8 @@ class TestWebServer(unittest.TestCase):
         self.assertEqual(self.server.port, 8080)
         self.assertIsNone(self.server.app)
         self.assertIsNone(self.server.camera)
+        self.assertIsNone(self.server.detector)
+        self.assertEqual(self.server.latest_detections, [])
     
     def test_init_default_params(self):
         """Test server initialization with default parameters."""
@@ -36,6 +39,13 @@ class TestWebServer(unittest.TestCase):
         self.server.set_camera(mock_camera)
         
         self.assertEqual(self.server.camera, mock_camera)
+    
+    def test_set_detector(self):
+        """Test setting detector instance."""
+        mock_detector = Mock(spec=PedestrianDetector)
+        self.server.set_detector(mock_detector)
+        
+        self.assertEqual(self.server.detector, mock_detector)
     
     def test_create_app(self):
         """Test application creation."""
@@ -55,6 +65,8 @@ class TestWebServer(unittest.TestCase):
         
         self.assertIn('/', route_paths)
         self.assertIn('/stream', route_paths)
+        self.assertIn('/detections', route_paths)
+        self.assertIn('/fps', route_paths)
     
     def test_get_host(self):
         """Test getting server host."""
@@ -119,20 +131,22 @@ class TestWebServerAsync(AioHTTPTestCase):
     @unittest_run_loop
     async def test_handle_stream_success(self):
         """Test successful stream handling."""
+        import numpy as np
+        
         mock_camera = Mock(spec=CameraCapture)
         mock_camera.is_opened.return_value = True
         
-        # Simulate returning a frame then None to end stream
-        jpeg_data = b'\xff\xd8\xff\xe0test_jpeg_data'
+        # Simulate returning a frame then failing to end stream  
+        test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         call_count = [0]
         
-        def get_frame_side_effect():
+        def read_frame_side_effect():
             call_count[0] += 1
             if call_count[0] <= 2:
-                return jpeg_data
-            return None
+                return (True, test_frame)
+            return (False, None)
         
-        mock_camera.get_jpeg_frame.side_effect = get_frame_side_effect
+        mock_camera.read_frame.side_effect = read_frame_side_effect
         
         self.web_server.set_camera(mock_camera)
         
@@ -146,8 +160,69 @@ class TestWebServerAsync(AioHTTPTestCase):
         )
         
         # Read some data
-        chunk = await resp.content.read(100)
+        chunk = await resp.content.read(1000)
         self.assertGreater(len(chunk), 0)
+    
+    @unittest_run_loop
+    async def test_handle_detections_empty(self):
+        """Test detections endpoint with no detections."""
+        resp = await self.client.request('GET', '/detections')
+        
+        self.assertEqual(resp.status, 200)
+        data = await resp.json()
+        
+        self.assertEqual(data['count'], 0)
+        self.assertEqual(data['detections'], [])
+        self.assertIn('timestamp', data)
+    
+    @unittest_run_loop
+    async def test_handle_detections_with_data(self):
+        """Test detections endpoint with detection data."""
+        from src.detector import DetectionResult
+        
+        # Add some mock detections
+        det1 = DetectionResult((100.0, 100.0, 200.0, 300.0), 0.95, "Center-Mid")
+        det2 = DetectionResult((300.0, 150.0, 400.0, 350.0), 0.87, "Right-Near")
+        self.web_server.latest_detections = [det1, det2]
+        
+        resp = await self.client.request('GET', '/detections')
+        
+        self.assertEqual(resp.status, 200)
+        data = await resp.json()
+        
+        self.assertEqual(data['count'], 2)
+        self.assertEqual(len(data['detections']), 2)
+        self.assertEqual(data['detections'][0]['location'], "Center-Mid")
+        self.assertEqual(data['detections'][1]['location'], "Right-Near")
+        self.assertAlmostEqual(data['detections'][0]['confidence'], 0.95, places=2)
+    
+    @unittest_run_loop
+    async def test_handle_fps_no_camera(self):
+        """Test FPS endpoint with no camera."""
+        resp = await self.client.request('GET', '/fps')
+        
+        self.assertEqual(resp.status, 200)
+        data = await resp.json()
+        
+        self.assertEqual(data['fps'], 0.0)
+        self.assertIn('timestamp', data)
+    
+    @unittest_run_loop
+    async def test_handle_fps_with_camera(self):
+        """Test FPS endpoint with camera."""
+        # Create mock camera with FPS
+        mock_camera = Mock(spec=CameraCapture)
+        mock_camera.get_fps.return_value = 28.5
+        
+        self.web_server.set_camera(mock_camera)
+        
+        resp = await self.client.request('GET', '/fps')
+        
+        self.assertEqual(resp.status, 200)
+        data = await resp.json()
+        
+        self.assertEqual(data['fps'], 28.5)
+        self.assertIn('timestamp', data)
 
 
 class TestWebServerMethods(unittest.TestCase):

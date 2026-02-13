@@ -13,6 +13,7 @@ import logging
 from src.main import Application, main
 from src.camera import CameraCapture
 from src.server import WebServer
+from src.detector import PedestrianDetector
 
 
 class TestApplicationIntegration(unittest.TestCase):
@@ -51,27 +52,49 @@ class TestApplicationIntegration(unittest.TestCase):
         self.assertTrue(result)
         self.assertIsInstance(app.camera, CameraCapture)
     
+    @patch('src.detector.YOLO')
+    def test_detector_integration_mocked(self, mock_yolo):
+        """Test detector integration with mocked YOLO."""
+        mock_model = Mock()
+        mock_yolo.return_value = mock_model
+        
+        app = Application()
+        result = app.initialize_detector()
+        
+        self.assertTrue(result)
+        self.assertIsInstance(app.detector, PedestrianDetector)
+    
+    @patch('src.detector.YOLO')
     @patch('src.camera.cv2.VideoCapture')
-    def test_server_integration_mocked(self, mock_video_capture):
+    def test_server_integration_mocked(self, mock_video_capture, mock_yolo):
         """Test server integration with mocked dependencies."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
         mock_video_capture.return_value = mock_cap
         
+        mock_model = Mock()
+        mock_yolo.return_value = mock_model
+        
         app = Application()
         app.initialize_camera()
+        app.initialize_detector()
         app.initialize_server()
         
         self.assertIsInstance(app.server, WebServer)
         self.assertEqual(app.server.camera, app.camera)
+        self.assertEqual(app.server.detector, app.detector)
     
+    @patch('src.detector.YOLO')
     @patch('src.server.web.run_app')
     @patch('src.camera.cv2.VideoCapture')
-    def test_full_application_lifecycle_mocked(self, mock_video_capture, mock_run_app):
+    def test_full_application_lifecycle_mocked(self, mock_video_capture, mock_run_app, mock_yolo):
         """Test full application lifecycle with mocked dependencies."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
         mock_video_capture.return_value = mock_cap
+        
+        mock_model = Mock()
+        mock_yolo.return_value = mock_model
         
         app = Application(camera_id=0, host='127.0.0.1', port=8080)
         result = app.run()
@@ -80,13 +103,17 @@ class TestApplicationIntegration(unittest.TestCase):
         mock_run_app.assert_called_once()
         mock_cap.release.assert_called_once()
     
+    @patch('src.detector.YOLO')
     @patch('src.server.web.run_app')
     @patch('src.camera.cv2.VideoCapture')
-    def test_keyboard_interrupt_integration_mocked(self, mock_video_capture, mock_run_app):
+    def test_keyboard_interrupt_integration_mocked(self, mock_video_capture, mock_run_app, mock_yolo):
         """Test keyboard interrupt handling with mocked dependencies."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
         mock_video_capture.return_value = mock_cap
+        
+        mock_model = Mock()
+        mock_yolo.return_value = mock_model
         
         mock_run_app.side_effect = KeyboardInterrupt()
         

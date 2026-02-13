@@ -60,7 +60,7 @@ class TestCameraIntegration(unittest.TestCase):
         camera = CameraCapture()
         self.assertTrue(camera.initialize())
         
-        # Verify buffer size was set to 1
+        # Verify buffer size was set to 5
         mock_cap.set.assert_any_call(38, 1)  # CAP_PROP_BUFFERSIZE = 38
         
         success, frame = camera.read_frame()

@@ -21,6 +21,7 @@ class TestApplication(unittest.TestCase):
         self.assertEqual(self.app.host, '127.0.0.1')
         self.assertEqual(self.app.port, 8080)
         self.assertIsNone(self.app.camera)
+        self.assertIsNone(self.app.detector)
         self.assertIsNone(self.app.server)
     
     def test_init_custom_params(self):
@@ -60,6 +61,31 @@ class TestApplication(unittest.TestCase):
         
         self.assertFalse(result)
     
+    @patch('src.main.PedestrianDetector')
+    def test_initialize_detector_success(self, mock_detector_class):
+        """Test successful detector initialization."""
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = True
+        mock_detector_class.return_value = mock_detector
+        
+        result = self.app.initialize_detector()
+        
+        self.assertTrue(result)
+        mock_detector_class.assert_called_once_with()
+        mock_detector.initialize.assert_called_once()
+        self.assertEqual(self.app.detector, mock_detector)
+    
+    @patch('src.main.PedestrianDetector')
+    def test_initialize_detector_failure(self, mock_detector_class):
+        """Test failed detector initialization."""
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = False
+        mock_detector_class.return_value = mock_detector
+        
+        result = self.app.initialize_detector()
+        
+        self.assertFalse(result)
+    
     @patch('src.main.WebServer')
     def test_initialize_server(self, mock_server_class):
         """Test server initialization."""
@@ -69,20 +95,29 @@ class TestApplication(unittest.TestCase):
         mock_camera = Mock()
         self.app.camera = mock_camera
         
+        mock_detector = Mock()
+        self.app.detector = mock_detector
+        
         self.app.initialize_server()
         
         mock_server_class.assert_called_once_with(host='127.0.0.1', port=8080)
         mock_server.set_camera.assert_called_once_with(mock_camera)
+        mock_server.set_detector.assert_called_once_with(mock_detector)
         self.assertEqual(self.app.server, mock_server)
     
+    @patch('src.main.PedestrianDetector')
     @patch('src.main.WebServer')
     @patch('src.main.CameraCapture')
-    def test_run_success(self, mock_camera_class, mock_server_class):
+    def test_run_success(self, mock_camera_class, mock_server_class, mock_detector_class):
         """Test successful application run."""
         # Setup mocks
         mock_camera = Mock()
         mock_camera.initialize.return_value = True
         mock_camera_class.return_value = mock_camera
+        
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = True
+        mock_detector_class.return_value = mock_detector
         
         mock_server = Mock()
         mock_server_class.return_value = mock_server
@@ -92,8 +127,10 @@ class TestApplication(unittest.TestCase):
         
         self.assertEqual(result, 0)
         mock_camera.initialize.assert_called_once()
+        mock_detector.initialize.assert_called_once()
         mock_server.run.assert_called_once()
         mock_camera.release.assert_called_once()
+        mock_detector.release.assert_called_once()
     
     @patch('src.main.CameraCapture')
     def test_run_camera_init_failure(self, mock_camera_class):
@@ -106,13 +143,34 @@ class TestApplication(unittest.TestCase):
         
         self.assertEqual(result, 1)
     
+    @patch('src.main.PedestrianDetector')
+    @patch('src.main.CameraCapture')
+    def test_run_detector_init_failure(self, mock_camera_class, mock_detector_class):
+        """Test application run with detector initialization failure."""
+        mock_camera = Mock()
+        mock_camera.initialize.return_value = True
+        mock_camera_class.return_value = mock_camera
+        
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = False
+        mock_detector_class.return_value = mock_detector
+        
+        result = self.app.run()
+        
+        self.assertEqual(result, 1)
+    
+    @patch('src.main.PedestrianDetector')
     @patch('src.main.WebServer')
     @patch('src.main.CameraCapture')
-    def test_run_keyboard_interrupt(self, mock_camera_class, mock_server_class):
+    def test_run_keyboard_interrupt(self, mock_camera_class, mock_server_class, mock_detector_class):
         """Test application run with keyboard interrupt."""
         mock_camera = Mock()
         mock_camera.initialize.return_value = True
         mock_camera_class.return_value = mock_camera
+        
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = True
+        mock_detector_class.return_value = mock_detector
         
         mock_server = Mock()
         mock_server.run.side_effect = KeyboardInterrupt()
@@ -122,14 +180,20 @@ class TestApplication(unittest.TestCase):
         
         self.assertEqual(result, 0)
         mock_camera.release.assert_called_once()
+        mock_detector.release.assert_called_once()
     
+    @patch('src.main.PedestrianDetector')
     @patch('src.main.WebServer')
     @patch('src.main.CameraCapture')
-    def test_run_exception(self, mock_camera_class, mock_server_class):
+    def test_run_exception(self, mock_camera_class, mock_server_class, mock_detector_class):
         """Test application run with exception."""
         mock_camera = Mock()
         mock_camera.initialize.return_value = True
         mock_camera_class.return_value = mock_camera
+        
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = True
+        mock_detector_class.return_value = mock_detector
         
         mock_server = Mock()
         mock_server.run.side_effect = Exception("Test error")
@@ -139,24 +203,33 @@ class TestApplication(unittest.TestCase):
         
         self.assertEqual(result, 1)
         mock_camera.release.assert_called_once()
+        mock_detector.release.assert_called_once()
     
     def test_cleanup_no_camera(self):
         """Test cleanup when camera is not initialized."""
         self.app.cleanup()
         # Should not raise exception
         self.assertIsNone(self.app.camera)
+        self.assertIsNone(self.app.detector)
     
+    @patch('src.main.PedestrianDetector')
     @patch('src.main.CameraCapture')
-    def test_cleanup_with_camera(self, mock_camera_class):
-        """Test cleanup with initialized camera."""
+    def test_cleanup_with_resources(self, mock_camera_class, mock_detector_class):
+        """Test cleanup with initialized resources."""
         mock_camera = Mock()
         mock_camera.initialize.return_value = True
         mock_camera_class.return_value = mock_camera
         
+        mock_detector = Mock()
+        mock_detector.initialize.return_value = True
+        mock_detector_class.return_value = mock_detector
+        
         self.app.initialize_camera()
+        self.app.initialize_detector()
         self.app.cleanup()
         
         mock_camera.release.assert_called_once()
+        mock_detector.release.assert_called_once()
 
 
 class TestMainFunction(unittest.TestCase):

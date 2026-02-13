@@ -7,25 +7,20 @@ import sys
 import logging
 from src.camera import CameraCapture
 from src.server import WebServer
+from src.detector import PedestrianDetector
+from src.settings import settings
 
 
 class Application:
     """Main application class for vision location detector."""
     
-    def __init__(self, camera_id: int = 0, host: str = '0.0.0.0', port: int = 8080):
-        """Initialize the application.
-        
-        Args:
-            camera_id: Camera device ID
-            host: Server host address
-            port: Server port number
-        """
-        self.camera_id = camera_id
-        self.host = host
-        self.port = port
+    def __init__(self):
+        """Initialize the application using settings from environment."""
         self.camera = None
+        self.detector = None
         self.server = None
         self._setup_logging()
+        self.logger.info(f"Application settings: {settings}")
     
     def _setup_logging(self) -> None:
         """Set up logging configuration."""
@@ -41,8 +36,12 @@ class Application:
         Returns:
             True if initialization successful, False otherwise
         """
-        self.logger.info(f"Initializing camera {self.camera_id}...")
-        self.camera = CameraCapture(camera_id=self.camera_id)
+        self.logger.info(f"Initializing camera {settings.camera_id}...")
+        self.camera = CameraCapture(
+            camera_id=settings.camera_id,
+            width=settings.camera_width,
+            height=settings.camera_height
+        )
         
         if not self.camera.initialize():
             self.logger.error("Failed to initialize camera")
@@ -51,14 +50,43 @@ class Application:
         self.logger.info("Camera initialized successfully")
         return True
     
+    def initialize_detector(self) -> bool:
+        """Initialize the pedestrian detector.
+        
+        Returns:
+            True if initialization successful, False otherwise
+        """
+        if not settings.enable_yolo:
+            self.logger.info("YOLO disabled by configuration (ENABLE_YOLO=false)")
+            return True
+        
+        self.logger.info("Initializing YOLO pedestrian detector...")
+        self.detector = PedestrianDetector(
+            model_path=settings.yolo_model_path,
+            confidence_threshold=settings.confidence_threshold,
+            use_tensorrt=settings.use_tensorrt,
+            device=settings.device
+        )
+        
+        if not self.detector.initialize():
+            self.logger.error("Failed to initialize detector")
+            return False
+        
+        self.logger.info("Detector initialized successfully")
+        return True
+    
     def initialize_server(self) -> None:
         """Initialize the web server."""
-        self.logger.info(f"Initializing web server on {self.host}:{self.port}...")
-        self.server = WebServer(host=self.host, port=self.port)
+        self.logger.info(f"Initializing web server on {settings.server_host}:{settings.server_port}...")
+        self.server = WebServer(host=settings.server_host, port=settings.server_port)
         
         # Type narrowing: ensure camera was initialized
         if self.camera is not None:
             self.server.set_camera(self.camera)
+        
+        # Set detector if available
+        if self.detector is not None:
+            self.server.set_detector(self.detector)
         
         self.logger.info("Web server initialized")
     
@@ -73,6 +101,11 @@ class Application:
             if not self.initialize_camera():
                 return 1
             
+            # Initialize detector with Jetson GPU acceleration (optional)
+            # If this fails, we still run with camera-only mode
+            if not self.initialize_detector():
+                self.logger.warning("Failed to initialize detector - running in camera-only mode")
+            
             # Initialize server
             self.initialize_server()
             
@@ -83,7 +116,7 @@ class Application:
             
             # Start server
             self.logger.info("Starting application...")
-            self.logger.info(f"Access the application at http://{self.host}:{self.port}")
+            self.logger.info(f"Access the application at http://{settings.server_host}:{settings.server_port}")
             self.server.run()
             
             return 0
@@ -102,6 +135,10 @@ class Application:
         if self.camera is not None:
             self.logger.info("Releasing camera...")
             self.camera.release()
+        
+        if self.detector is not None:
+            self.logger.info("Releasing detector...")
+            self.detector.release()
 
 
 def main() -> int:
@@ -110,30 +147,8 @@ def main() -> int:
     Returns:
         Exit code
     """
-    # Parse command line arguments (basic)
-    camera_id = 0
-    host = '0.0.0.0'
-    port = 8080
-    
-    if len(sys.argv) > 1:
-        try:
-            camera_id = int(sys.argv[1])
-        except ValueError:
-            print(f"Invalid camera ID: {sys.argv[1]}")
-            return 1
-    
-    if len(sys.argv) > 2:
-        host = sys.argv[2]
-    
-    if len(sys.argv) > 3:
-        try:
-            port = int(sys.argv[3])
-        except ValueError:
-            print(f"Invalid port: {sys.argv[3]}")
-            return 1
-    
-    # Create and run application
-    app = Application(camera_id=camera_id, host=host, port=port)
+    # Create and run application (settings loaded from environment/.env)
+    app = Application()
     return app.run()
 
 

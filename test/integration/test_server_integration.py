@@ -7,6 +7,7 @@ packages both mocked and unmocked, as per dev rules.
 import unittest
 from unittest.mock import Mock, patch, AsyncMock, mock_open
 import asyncio
+import json
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
@@ -14,6 +15,7 @@ from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 import aiohttp
 from src.server import WebServer
 from src.camera import CameraCapture
+from src.detector import PedestrianDetector, DetectionResult
 
 
 class TestServerIntegration(unittest.TestCase):
@@ -63,6 +65,14 @@ class TestServerIntegration(unittest.TestCase):
         server.set_camera(camera)
         self.assertEqual(server.camera, camera)
     
+    def test_detector_integration_unmocked(self):
+        """Test detector integration with server."""
+        server = WebServer()
+        detector = Mock(spec=PedestrianDetector)
+        
+        server.set_detector(detector)
+        self.assertEqual(server.detector, detector)
+    
     @patch('builtins.open', mock_open(read_data='<html>Test</html>'))
     def test_file_io_integration_mocked(self):
         """Test file I/O integration with mocked open."""
@@ -110,6 +120,38 @@ class TestServerAsyncIntegration(AioHTTPTestCase):
         self.assertIsInstance(resp, aiohttp.ClientResponse)
     
     @unittest_run_loop
+    async def test_detections_route_unmocked(self):
+        """Test detections route with unmocked aiohttp."""
+        resp = await self.client.request('GET', '/detections')
+        
+        self.assertEqual(resp.status, 200)
+        self.assertIsInstance(resp, aiohttp.ClientResponse)
+        
+        # Verify JSON response
+        data = await resp.json()
+        self.assertIn('count', data)
+        self.assertIn('detections', data)
+        self.assertIn('timestamp', data)
+    
+    @unittest_run_loop
+    async def test_detections_with_data_mocked(self):
+        """Test detections endpoint with mocked detection data."""
+        # Add mock detections
+        det1 = DetectionResult((100.0, 100.0, 200.0, 300.0), 0.95, "Center-Mid")
+        det2 = DetectionResult((300.0, 150.0, 400.0, 350.0), 0.87, "Right-Near")
+        self.web_server.latest_detections = [det1, det2]
+        
+        resp = await self.client.request('GET', '/detections')
+        
+        self.assertEqual(resp.status, 200)
+        data = await resp.json()
+        
+        self.assertEqual(data['count'], 2)
+        self.assertEqual(len(data['detections']), 2)
+        self.assertEqual(data['detections'][0]['location'], "Center-Mid")
+        self.assertEqual(data['detections'][1]['location'], "Right-Near")
+    
+    @unittest_run_loop
     async def test_full_server_lifecycle_mocked(self):
         """Test full server lifecycle with mocked camera."""
         # Create mock camera
@@ -152,19 +194,22 @@ class TestServerAsyncIntegration(AioHTTPTestCase):
     @unittest_run_loop
     async def test_streaming_response_mocked(self):
         """Test streaming response with mocked camera data."""
+        import numpy as np
+        
         mock_camera = Mock(spec=CameraCapture)
         mock_camera.is_opened.return_value = True
         
         # Create counter for limiting frames
         frame_count = [0]
+        test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         
-        def get_frame():
+        def read_frame():
             frame_count[0] += 1
             if frame_count[0] <= 3:
-                return b'\xff\xd8\xff\xe0frame_data'
-            return None
+                return (True, test_frame)
+            return (False, None)
         
-        mock_camera.get_jpeg_frame.side_effect = get_frame
+        mock_camera.read_frame.side_effect = read_frame
         
         self.web_server.set_camera(mock_camera)
         
@@ -175,8 +220,44 @@ class TestServerAsyncIntegration(AioHTTPTestCase):
         self.assertIn('multipart/x-mixed-replace', resp.headers['Content-Type'])
         
         # Read first chunk
-        chunk = await resp.content.read(50)
+        chunk = await resp.content.read(1000)
         self.assertGreater(len(chunk), 0)
+
+
+class TestServerJSONIntegration(unittest.TestCase):
+    """Integration tests for JSON handling."""
+    
+    def test_json_import_unmocked(self):
+        """Test that json module can be imported without mocking."""
+        self.assertTrue(hasattr(json, 'dumps'))
+        self.assertTrue(hasattr(json, 'loads'))
+    
+    def test_json_serialization_unmocked(self):
+        """Test JSON serialization of DetectionResult unmocked."""
+        det = DetectionResult((10.0, 20.0, 100.0, 200.0), 0.95, "Center-Mid")
+        data = det.to_dict()
+        
+        # Test that we can serialize to JSON
+        json_str = json.dumps(data)
+        self.assertIsInstance(json_str, str)
+        
+        # Test that we can deserialize
+        parsed = json.loads(json_str)
+        self.assertEqual(parsed['location'], "Center-Mid")
+        self.assertEqual(parsed['confidence'], 0.95)
+    
+    @patch('json.dumps')
+    def test_json_dumps_mocked(self, mock_dumps):
+        """Test JSON dumps with mocking."""
+        mock_dumps.return_value = '{"test": "data"}'
+        
+        det = DetectionResult((10.0, 20.0, 100.0, 200.0), 0.95, "Center-Mid")
+        data = det.to_dict()
+        
+        result = json.dumps(data)
+        
+        self.assertEqual(result, '{"test": "data"}')
+        mock_dumps.assert_called_once()
 
 
 class TestServerOSIntegration(unittest.TestCase):

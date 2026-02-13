@@ -5,10 +5,12 @@ A real-time video streaming application designed for Nvidia Jetson Orin Nano tha
 ## Features
 
 - **Real-time Video Streaming**: MJPEG streaming at ~30 FPS
-- **Web Interface**: Clean, responsive HTML interface for viewing the camera feed
-- **Hardware Optimized**: Configured for Nvidia Jetson Orin Nano with hardware acceleration
+- **Pedestrian Detection**: YOLOv8-based pedestrian detection with location tracking
+- **Web Interface**: Clean, responsive HTML interface with live detection updates
+- **Hardware Optimized**: Configured for Nvidia Jetson Orin Nano with TensorRT acceleration
 - **Asynchronous**: Built with aiohttp for efficient async request handling
-- **Camera Positioning**: Designed for 45° downward angle for optimal floor coverage
+- **Camera Positioning**: Designed for 60° downward angle for optimal floor coverage
+- **REST API**: JSON endpoint for detection data
 
 ## Project Structure
 
@@ -82,6 +84,32 @@ python -m src.main 1
 Custom host and port:
 ```bash
 python -m src.main 0 0.0.0.0 9090
+```
+
+### Debugging in VS Code
+
+Use the provided launch configurations in `.vscode/launch.json`:
+- **Python: Run Server** - Run with default settings
+- **Python: Run Server (Custom Camera)** - Specify camera, host, and port
+- **Python: Run Server (Port 9090)** - Run on alternate port
+- **Python: Run Tests** - Run all tests with pytest
+
+Press F5 or use the Run and Debug panel to start debugging.
+
+### Stopping the Server
+
+Kill the running server using either method:
+
+**Bash script:**
+```bash
+./kill_server.sh
+```
+
+**Python script:**
+```bash
+python -m src.kill_server
+# Or with force flag
+python -m src.kill_server --force
 ```
 
 ### Accessing the Web Interface

@@ -42,7 +42,7 @@ class TestCameraCapture(unittest.TestCase):
         # Verify resolution and buffer size are set
         mock_cap.set.assert_any_call(3, 640)  # CAP_PROP_FRAME_WIDTH = 3
         mock_cap.set.assert_any_call(4, 480)  # CAP_PROP_FRAME_HEIGHT = 4
-        mock_cap.set.assert_any_call(38, 1)   # CAP_PROP_BUFFERSIZE = 38
+        mock_cap.set.assert_any_call(38, 1)   # CAP_PROP_BUFFERSIZE = 38, value = 1
     
     @patch('cv2.VideoCapture')
     def test_initialize_failure(self, mock_video_capture):
@@ -95,7 +95,7 @@ class TestCameraCapture(unittest.TestCase):
     
     @patch('cv2.VideoCapture')
     def test_buffer_size_set_for_latest_frame(self, mock_video_capture):
-        """Test that buffer size is set to 1 for latest frame retrieval."""
+        """Test that buffer size is set for latest frame retrieval."""
         mock_cap = Mock()
         mock_cap.isOpened.return_value = True
         mock_video_capture.return_value = mock_cap
@@ -193,6 +193,52 @@ class TestCameraCapture(unittest.TestCase):
         self.camera.release()
         
         self.assertFalse(self.camera.is_opened())
+    
+    def test_get_fps_initial(self):
+        """Test get_fps returns 0.0 initially."""
+        fps = self.camera.get_fps()
+        self.assertEqual(fps, 0.0)
+    
+    @patch('cv2.VideoCapture')
+    def test_fps_calculation(self, mock_video_capture):
+        """Test FPS calculation after reading frames."""
+        mock_cap = Mock()
+        mock_cap.isOpened.return_value = True
+        test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        mock_cap.read.return_value = (True, test_frame)
+        mock_video_capture.return_value = mock_cap
+        
+        self.camera.initialize()
+        
+        # Manually set FPS tracking values to simulate 30 FPS
+        import time
+        start_time = time.time()
+        self.camera._fps_start_time = start_time - 1.0  # 1 second ago
+        self.camera._frame_count = 30
+        
+        # Read one more frame to trigger FPS calculation
+        self.camera.read_frame()
+        
+        # FPS should be calculated (30 frames / ~1.0 seconds)
+        fps = self.camera.get_fps()
+        self.assertGreater(fps, 25.0)  # Should be around 30, allow some tolerance
+        self.assertLess(fps, 35.0)
+    
+    @patch('cv2.VideoCapture')
+    def test_fps_not_updated_on_failed_read(self, mock_video_capture):
+        """Test that FPS is not updated when frame read fails."""
+        mock_cap = Mock()
+        mock_cap.isOpened.return_value = True
+        mock_cap.read.return_value = (False, None)
+        mock_video_capture.return_value = mock_cap
+        
+        self.camera.initialize()
+        initial_fps = self.camera.get_fps()
+        
+        # Failed reads should not affect FPS
+        self.camera.read_frame()
+        
+        self.assertEqual(self.camera.get_fps(), initial_fps)
 
 
 if __name__ == '__main__':

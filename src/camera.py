@@ -7,6 +7,7 @@ optimized for Nvidia Jetson Orin Nano hardware.
 import cv2
 from typing import Optional, Tuple
 import numpy as np
+import time
 
 
 class CameraCapture:
@@ -25,6 +26,11 @@ class CameraCapture:
         self.height = height
         self.capture: Optional[cv2.VideoCapture] = None
         
+        # FPS tracking
+        self._frame_count = 0
+        self._fps_start_time = time.time()
+        self._current_fps = 0.0
+        
     def initialize(self) -> bool:
         """Initialize the camera device.
         
@@ -42,7 +48,7 @@ class CameraCapture:
         
         # Set buffer size to 1 to always get the latest frame (critical for YOLO)
         # This prevents processing stale frames when detection is slower than capture rate
-        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 5)
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         
         # Enable hardware acceleration for Jetson
         self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # type: ignore[attr-defined]
@@ -64,6 +70,19 @@ class CameraCapture:
             return False, None
             
         success, frame = self.capture.read()
+        
+        # Update FPS calculation
+        if success:
+            self._frame_count += 1
+            current_time = time.time()
+            elapsed = current_time - self._fps_start_time
+            
+            # Calculate FPS once per second
+            if elapsed >= 1.0:
+                self._current_fps = self._frame_count / elapsed
+                self._frame_count = 0
+                self._fps_start_time = current_time
+        
         return success, frame
     
     def get_jpeg_frame(self, quality: int = 85) -> Optional[bytes]:
@@ -88,6 +107,16 @@ class CameraCapture:
             return None
             
         return buffer.tobytes()
+    
+    def get_fps(self) -> float:
+        """Get the current frames per second.
+        
+        FPS is calculated once per second based on actual frame capture rate.
+        
+        Returns:
+            Current FPS as a float, or 0.0 if not yet calculated
+        """
+        return self._current_fps
     
     def release(self) -> None:
         """Release the camera device."""
