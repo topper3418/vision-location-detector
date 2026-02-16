@@ -11,6 +11,7 @@ import cv2
 import json
 
 from src.camera import CameraCapture
+from src.camera_base import CameraBase
 from src.detector import PedestrianDetector, DetectionResult
 from src.settings import settings
 
@@ -38,16 +39,32 @@ class WebServer:
         self.host = host
         self.port = port
         self.app: Optional[web.Application] = None
-        self.camera: Optional[CameraCapture] = None
+        self.camera: Optional[CameraBase] = None
         self.detector: Optional[PedestrianDetector] = None
         self.latest_detections: List[DetectionResult] = []
+        self._latest_frame = None
+        self._detection_lock = asyncio.Lock()
+        self._detection_task = None
+
+    async def _detection_loop(self):
+        import numpy as np
+        import cv2
+        while True:
+            if self._latest_frame is not None and self.detector is not None:
+                frame = self._latest_frame
+                self._latest_frame = None  # Drop all but the latest
+                # Debug: print frame shape and dtype
+                print(f"[DEBUG] Frame shape: {frame.shape}, dtype: {frame.dtype}")
+                # Convert BGR (OpenCV) to RGB for YOLO if needed
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                async with self._detection_lock:
+                    detections = self.detector.detect(rgb_frame)
+                    self.latest_detections = detections
+                    self._latest_processed_frame = self.detector.draw_detections(frame, detections)
+            await asyncio.sleep(0.001)
     
-    def set_camera(self, camera: CameraCapture) -> None:
-        """Set the camera capture instance.
-        
-        Args:
-            camera: CameraCapture instance to use for streaming
-        """
+    def set_camera(self, camera: CameraBase) -> None:
+        """Set the camera capture instance (supports any CameraBase subclass)."""
         self.camera = camera
     
     def set_detector(self, detector: PedestrianDetector) -> None:
@@ -122,55 +139,42 @@ class WebServer:
         )
         
         await response.prepare(request)
-        
+        # Start detection loop if not already running
+        if self._detection_task is None:
+            self._detection_task = asyncio.create_task(self._detection_loop())
+
         try:
             while True:
-                # Get raw frame for detection
+                # Always grab the latest frame
                 success, frame = self.camera.read_frame()
-                
                 if not success or frame is None:
-                    await asyncio.sleep(0.1)
+                    print("CAMERA READ FAILED: No frame captured")
+                    await asyncio.sleep(0.01)
                     continue
-                
-                # Run pedestrian detection if detector is available
-                if self.detector is not None:
-                    detections = self.detector.detect(frame)
-                    self.latest_detections = detections  # Store for JSON endpoint
-                    frame = self.detector.draw_detections(frame, detections)
-                    
-                    # Print detection info to console
-                    if detections:
-                        print(f"\nDetected {len(detections)} person(s):")
-                        for i, det in enumerate(detections, 1):
-                            print(f"  {i}. Location: {det.location}, "
-                                  f"Confidence: {det.confidence:.2f}")
-                
+                self._latest_frame = frame
+
+                # Wait for detection to finish and get the latest processed frame
+                processed_frame = getattr(self, '_latest_processed_frame', frame)
+
                 # Encode processed frame as JPEG
                 encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), settings.jpeg_quality]
-                success, buffer = cv2.imencode('.jpg', frame, encode_params)
-                
+                success, buffer = cv2.imencode('.jpg', processed_frame, encode_params)
                 if not success:
-                    await asyncio.sleep(0.1)
+                    print("JPEG ENCODE FAILED: Unable to encode frame")
+                    await asyncio.sleep(0.01)
                     continue
-                
                 jpeg_data = buffer.tobytes()
-                
-                # Send frame as multipart data
                 await response.write(
                     b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' + 
                     jpeg_data + 
                     b'\r\n'
                 )
-                
-                # Yield control to event loop without sleep for maximum FPS
                 await asyncio.sleep(0)
-                
         except (ConnectionResetError, asyncio.CancelledError):
             pass
         finally:
             await response.write_eof()
-        
         return response
     
     async def handle_detections(self, request: web.Request) -> web.Response:

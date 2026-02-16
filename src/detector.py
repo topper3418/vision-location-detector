@@ -62,47 +62,50 @@ class PedestrianDetector:
         self.confidence_threshold = confidence_threshold
         self.use_tensorrt = use_tensorrt
         
-        # Auto-detect device if not specified
+        # Device selection logic
         if device is None:
+            # Auto-detect: use CUDA if available, else CPU
             try:
                 import torch
-                self.device = '0' if torch.cuda.is_available() else 'cpu'
+                self.device = 'cuda' if (hasattr(torch, 'cuda') and torch.cuda.is_available()) else 'cpu'
             except ImportError:
                 self.device = 'cpu'
         else:
-            self.device = device
+            # Normalize device names
+            if device in ['cuda', 'gpu', '0']:
+                import torch
+                if not (hasattr(torch, 'cuda') and torch.cuda.is_available()):
+                    raise RuntimeError("CUDA device requested but not available. Aborting.")
+                self.device = 'cuda'
+            elif device == 'cpu':
+                self.device = 'cpu'
+            else:
+                self.device = device
             
         self.model: Optional[YOLO] = None
         self.camera_angle: float = 60.0  # degrees downward
         
     def initialize(self) -> bool:
-        """Initialize the YOLO model.
-        
-        Returns:
-            True if initialization successful, False otherwise
-        """
-        try:
-            self.model = YOLO(self.model_path)
-            
-            # Export to TensorRT for Jetson acceleration if requested
-            if self.use_tensorrt and self.model is not None:
-                try:
-                    # Try to export to TensorRT format
-                    # On Jetson, this will use GPU acceleration
-                    self.model.export(format='engine', half=True)
-                    # Load the TensorRT model
-                    engine_path = self.model_path.replace('.pt', '.engine')
-                    self.model = YOLO(engine_path)
-                except Exception as e:
-                    # Fallback to regular model if TensorRT fails
-                    # This is expected on non-Jetson hardware
-                    print(f"TensorRT export failed, using default model: {e}")
-                    self.model = YOLO(self.model_path)
-            
-            return True
-        except Exception as e:
-            print(f"Failed to initialize YOLO model: {e}")
-            return False
+        """Initialize the YOLO model. Raises on failure."""
+        print(f"Initializing YOLO model on device: {self.device}")
+        self.model = YOLO(self.model_path)
+        # Export to TensorRT for Jetson acceleration if requested and CUDA is available
+        if self.use_tensorrt and self.model is not None and self.device == 'cuda':
+            import os
+            engine_path = self.model_path.replace('.pt', '.engine')
+            if os.path.exists(engine_path):
+                print(f"Found existing TensorRT engine: {engine_path}. Loading...")
+                self.model = YOLO(engine_path)
+                print("TensorRT model loaded successfully")
+            else:
+                print("TensorRT engine not found. Exporting...")
+                self.model.export(format='engine', half=True, device=self.device)
+                self.model = YOLO(engine_path)
+                print("TensorRT model exported and loaded successfully")
+        elif self.use_tensorrt and self.device != 'cuda':
+            raise RuntimeError("TensorRT requested but CUDA not available. Aborting.")
+        print(f"YOLO model initialized successfully on {self.device}")
+        return True
     
     def detect(self, frame: np.ndarray) -> List[DetectionResult]:
         """Detect pedestrians in a frame.
@@ -114,13 +117,20 @@ class PedestrianDetector:
             List of DetectionResult objects
         """
         if self.model is None:
-            return []
+            raise RuntimeError("YOLO model is not initialized. Aborting.")
         
         # Run YOLO detection with optimized settings
         # Use half precision (FP16) only on GPU for speed
         # imgsz=640 for balanced speed/accuracy
         use_half = self.device != 'cpu'
-        results = self.model(frame, verbose=False, device=self.device, imgsz=640, half=use_half)
+        print(f"Running detection on device: {self.device}, half precision: {use_half}")
+        
+        expected_size = (640, 640)
+        if frame.shape[0:2] != expected_size:
+            import cv2
+            frame = cv2.resize(frame, expected_size[::-1])
+        # Remove device argument for inference (TensorRT engine is already bound to device)
+        results = self.model(frame, verbose=False, imgsz=640, half=use_half)
         
         detections = []
         
