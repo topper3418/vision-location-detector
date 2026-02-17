@@ -88,7 +88,7 @@ class PedestrianDetector:
     def initialize(self) -> bool:
         """Initialize the YOLO model. Raises on failure."""
         print(f"Initializing YOLO model on device: {self.device}")
-        self.model = YOLO(self.model_path)
+        self.model = YOLO(self.model_path, task='detect')
         # Export to TensorRT for Jetson acceleration if requested and CUDA is available
         if self.use_tensorrt and self.model is not None and self.device == 'cuda':
             import os

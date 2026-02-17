@@ -10,9 +10,9 @@ import os
 import cv2
 import json
 
-from src.camera import CameraCapture
-from src.camera_base import CameraBase
-from src.detector import PedestrianDetector, DetectionResult
+from src.camera import CameraFeed
+from src.video_feed_base import VideoFeedBase
+from src.detector import DetectionResult
 from src.settings import settings
 
 
@@ -39,41 +39,16 @@ class WebServer:
         self.host = host
         self.port = port
         self.app: Optional[web.Application] = None
-        self.camera: Optional[CameraBase] = None
-        self.detector: Optional[PedestrianDetector] = None
+        self.video_feed: Optional[VideoFeedBase] = None
         self.latest_detections: List[DetectionResult] = []
-        self._latest_frame = None
-        self._detection_lock = asyncio.Lock()
-        self._detection_task = None
 
-    async def _detection_loop(self):
-        import numpy as np
-        import cv2
-        while True:
-            if self._latest_frame is not None and self.detector is not None:
-                frame = self._latest_frame
-                self._latest_frame = None  # Drop all but the latest
-                # Debug: print frame shape and dtype
-                print(f"[DEBUG] Frame shape: {frame.shape}, dtype: {frame.dtype}")
-                # Convert BGR (OpenCV) to RGB for YOLO if needed
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                async with self._detection_lock:
-                    detections = self.detector.detect(rgb_frame)
-                    self.latest_detections = detections
-                    self._latest_processed_frame = self.detector.draw_detections(frame, detections)
-            await asyncio.sleep(0.001)
+    # Detection loop is now handled by the video feed's postprocessing pipeline
     
-    def set_camera(self, camera: CameraBase) -> None:
-        """Set the camera capture instance (supports any CameraBase subclass)."""
-        self.camera = camera
+    def set_video_feed(self, video_feed: VideoFeedBase) -> None:
+        """Set the video feed instance (supports any VideoFeedBase subclass)."""
+        self.video_feed = video_feed
     
-    def set_detector(self, detector: PedestrianDetector) -> None:
-        """Set the pedestrian detector instance.
-        
-        Args:
-            detector: PedestrianDetector instance to use for detection
-        """
-        self.detector = detector
+    # Detector is now a postprocessor in the video feed pipeline
     
     def create_app(self) -> web.Application:
         """Create and configure the aiohttp application.
@@ -124,8 +99,8 @@ class WebServer:
         Returns:
             Streaming HTTP response with MJPEG video
         """
-        if self.camera is None or not self.camera.is_opened():
-            return web.Response(text='Camera not available', status=503)
+        if self.video_feed is None or not self.video_feed.is_opened():
+            return web.Response(text='Video feed not available', status=503)
         
         # Create multipart response for MJPEG stream
         response = web.StreamResponse(
@@ -139,26 +114,17 @@ class WebServer:
         )
         
         await response.prepare(request)
-        # Start detection loop if not already running
-        if self._detection_task is None:
-            self._detection_task = asyncio.create_task(self._detection_loop())
+        # No detection loop needed; handled by video feed postprocessors
 
         try:
-            while True:
-                # Always grab the latest frame
-                success, frame = self.camera.read_frame()
-                if not success or frame is None:
-                    print("CAMERA READ FAILED: No frame captured")
-                    await asyncio.sleep(0.01)
-                    continue
-                self._latest_frame = frame
-
-                # Wait for detection to finish and get the latest processed frame
-                processed_frame = getattr(self, '_latest_processed_frame', frame)
-
+            # Use the video feed's full stream (yields (data, processed) tuples)
+            for data, processed in self.video_feed.get_full_stream():
+                # If data is a list of detections, update latest_detections
+                if isinstance(data, list) and data and hasattr(data[0], 'to_dict'):
+                    self.latest_detections = data
                 # Encode processed frame as JPEG
                 encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), settings.jpeg_quality]
-                success, buffer = cv2.imencode('.jpg', processed_frame, encode_params)
+                success, buffer = cv2.imencode('.jpg', processed, encode_params)
                 if not success:
                     print("JPEG ENCODE FAILED: Unable to encode frame")
                     await asyncio.sleep(0.01)
@@ -187,7 +153,7 @@ class WebServer:
             JSON response with current detection results
         """
         # Check if detector is enabled
-        detector_enabled = self.detector is not None
+        detector_enabled = bool(self.video_feed and self.video_feed.postprocessors)
         
         detections_data = {
             'enabled': detector_enabled,
@@ -207,10 +173,10 @@ class WebServer:
         Returns:
             JSON response with current FPS
         """
-        if self.camera is None:
+        if self.video_feed is None:
             fps = 0.0
         else:
-            fps = self.camera.get_fps()
+            fps = self.video_feed.get_fps() if hasattr(self.video_feed, 'get_fps') else 0.0
         
         fps_data = {
             'fps': round(fps, 1),

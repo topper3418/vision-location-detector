@@ -5,11 +5,11 @@ import sys
 import time
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.detector import PedestrianDetector
-from src.spoof_camera import SpoofCamera
-from src.camera_base import CameraBase
+from src.spoof_video_feed import SpoofVideoFeed
+from src.video_feed_base import VideoFeedBase
 
 
-def main():
+def get_video_path():
     captures_dir = os.path.join(os.path.dirname(__file__), '..', 'captures')
     video_path = None
     if len(sys.argv) >= 2:
@@ -23,33 +23,37 @@ def main():
                 video_path = arg_path
             else:
                 print(f"Video file not found: {arg_path}")
-                return
+                return None
         else:
             if os.path.exists(arg_path):
                 video_path = arg_path
             else:
                 print(f"Video file not found: {arg_path}")
-                return
+                return None
     else:
         # No argument: use latest file in captures/
         if not os.path.exists(captures_dir):
             print("No captures/ directory found. Please record a video first.")
-            return
+            return None
         files = [f for f in os.listdir(captures_dir) if f.lower().endswith(('.avi', '.mp4', '.mov'))]
         if not files:
             print("No video files found in captures/. Please record a video first.")
-            return
+            return None
         files.sort(key=lambda f: os.path.getmtime(os.path.join(captures_dir, f)), reverse=True)
         video_path = os.path.join(captures_dir, files[0])
         print(f"No video argument given. Using latest capture: {files[0]}")
+    return video_path
 
+def main():
+    video_path = get_video_path()
+    if not video_path:
+        return
     print(f"Analyzing video: {video_path}")
-    
-    # Use spoof camera to simulate 30 FPS camera feed
 
-    camera: CameraBase = SpoofCamera(video_path)
-    if not camera.initialize():
-        print(f"Failed to initialize spoof camera for video: {video_path}")
+    # Use spoof video feed to simulate 30 FPS video feed
+    video_feed: VideoFeedBase = SpoofVideoFeed(video_path)
+    if not video_feed.initialize():
+        print(f"Failed to initialize spoof video feed for video: {video_path}")
         return
 
     detector = PedestrianDetector()
@@ -57,7 +61,8 @@ def main():
         print("Failed to initialize detector.")
         return
 
-    # Add detection as a postprocessor to the camera
+
+    # Add detection as a postprocessor to the video feed
     def detection_postprocessor(frame):
         import cv2
         print(f"[DEBUG] Frame shape: {frame.shape}, dtype: {frame.dtype}")
@@ -65,7 +70,7 @@ def main():
         detections = detector.detect(rgb_frame)
         annotated = detector.draw_detections(frame, detections)
         return (annotated, detections)
-    camera.add_postprocessor(detection_postprocessor)
+    video_feed.add_postprocessor(detection_postprocessor)
 
     frame_count = 0
     detection_count = 0
@@ -75,7 +80,7 @@ def main():
 
     print("Processing frames at exact 30 FPS simulation...")
 
-    for annotated_frame, detections in camera.get_processed_stream():
+    for detections in video_feed.get_data_stream():
         frame_count += 1
         if detections:
             detection_count += 1
@@ -87,7 +92,7 @@ def main():
             actual_fps = frame_count / elapsed if elapsed > 0 else 0
             print(f"Frame {frame_count}: {len(detections)} detection(s) | Actual FPS: {actual_fps:.1f}")
 
-    camera.release()
+    video_feed.release()
 
     # Calculate overall FPS
     total_time = time.time() - start_time

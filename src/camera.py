@@ -1,6 +1,7 @@
-"""Camera capture module for video feed streaming.
 
-This module handles camera initialization and frame capture using OpenCV,
+"""Video feed capture module for video streaming.
+
+This module handles video feed initialization and frame capture using OpenCV,
 optimized for Nvidia Jetson Orin Nano hardware.
 """
 
@@ -9,11 +10,13 @@ import cv2
 from typing import Optional, Tuple
 import numpy as np
 import time
-from .camera_base import CameraBase
+
+from .video_feed_base import VideoFeedBase
 
 
-class CameraCapture(CameraBase):
-    """Handles camera initialization and frame capture."""
+
+class CameraFeed(VideoFeedBase):
+    """Handles camera feed initialization and frame streaming."""
     def __init__(self, camera_id: int = 0, width: int = 640, height: int = 480):
         super().__init__()
         self.camera_id = camera_id
@@ -36,7 +39,7 @@ class CameraCapture(CameraBase):
         return True
 
     def read_frame(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """Read the latest frame from the camera.
+        """Read the latest frame from the video feed.
         Returns:
             Tuple (success, frame) where frame is a numpy array
         """

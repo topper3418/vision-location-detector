@@ -104,15 +104,12 @@ class TestPedestrianDetector(unittest.TestCase):
         
         self.assertEqual(location, "Right-Far")
     
-    def test_detect_empty_when_no_model(self):
-        """Test detect returns empty list when model not initialized."""
+    def test_detect_raises_when_no_model(self):
+        """Test detect raises RuntimeError when model not initialized."""
         detector = PedestrianDetector()
-        
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        
-        detections = detector.detect(frame)
-        
-        self.assertEqual(len(detections), 0)
+        with self.assertRaises(RuntimeError):
+            detector.detect(frame)
     
     def test_draw_detections_empty(self):
         """Test drawing with no detections."""
