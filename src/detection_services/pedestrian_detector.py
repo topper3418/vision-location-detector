@@ -62,15 +62,12 @@ class PedestrianDetector(DetectorDelegate):
             if self.use_tensorrt and self.model is not None and self.device == 'cuda':
                 import os
                 engine_path = self.model_path.replace('.pt', '.engine')
-                if os.path.exists(engine_path):
-                    print(f"Found existing TensorRT engine: {engine_path}. Loading...")
-                    self.model = YOLO(engine_path)
-                    print("TensorRT model loaded successfully")
-                else:
+                if not os.path.exists(engine_path):
                     print("TensorRT engine not found. Exporting...")
                     self.model.export(format='engine', half=True, device=self.device)
-                    self.model = YOLO(engine_path)
-                    print("TensorRT model exported and loaded successfully")
+                    print("TensorRT model exported successfully")
+                self.model = YOLO(engine_path, task='detect', verbose=False)
+                print("TensorRT model loaded successfully")
             elif self.use_tensorrt and self.device != 'cuda':
                 raise RuntimeError("TensorRT requested but CUDA not available. Aborting.")
             print(f"YOLO model initialized successfully on {self.device}")
@@ -84,7 +81,7 @@ class PedestrianDetector(DetectorDelegate):
         """Detect pedestrians in a frame and return DetectionResult list."""
         if self.model is None:
             raise RuntimeError("YOLO model is not initialized. Aborting.")
-        results = self.model(frame)
+        results = self.model(frame, verbose=False)
         detections: List[DetectionResult] = []
         for result in results:
             for box in getattr(result, 'boxes', []):

@@ -113,7 +113,6 @@ class WebServer:
         try:
             # Use the video feed's full stream (yields (data, processed) tuples)
             for data, processed in self.video_feed.get_full_stream():
-                print("STREAMING FRAME WITH DETECTIONS:", data)
                 # If data is a list of detections, update latest_detections
                 if isinstance(data, list) and data and hasattr(data[0], 'to_dict'):
                     self.latest_detections = data

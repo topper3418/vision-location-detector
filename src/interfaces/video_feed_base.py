@@ -16,8 +16,8 @@ class VideoFeedBase(ABC):
         self.detection_delegate = None
         self._measure_fps = False
         self._last_fps = 0.0
-        self._fps_frame_count = 0
-        self._fps_start_time = None
+        self._fps_timestamps = []  # List of frame timestamps for sliding window FPS
+        self._fps_window_seconds = 1.0  # Window size in seconds for FPS calculation
 
     @property
     def measure_fps(self) -> bool:
@@ -27,16 +27,15 @@ class VideoFeedBase(ABC):
     @measure_fps.setter
     def measure_fps(self, value: bool):
         self._measure_fps = value
+        import time
         if value:
-            self._fps_frame_count = 0
-            import time
-            self._fps_start_time = time.time()
+            self._fps_timestamps = []
         else:
-            self._fps_start_time = None
+            self._fps_timestamps = []
 
     @property
     def fps(self) -> float:
-        """Return the most recently calculated FPS value."""
+        """Return the most recently calculated FPS value (over the last second)."""
         return self._last_fps
 
     @abstractmethod
@@ -59,19 +58,27 @@ class VideoFeedBase(ABC):
         self.detection_delegate = delegate
 
     def get_raw_stream(self) -> Generator[np.ndarray, None, None]:
-        """Yields raw frames from the video feed. If measure_fps is enabled, calculates FPS after each frame."""
+        """Yields raw frames from the video feed. If measure_fps is enabled, calculates FPS using a sliding window."""
         import time
         while True:
             success, frame = self.read_frame()
             if not success or frame is None:
                 break
             if self._measure_fps:
-                self._fps_frame_count += 1
                 now = time.time()
-                if self._fps_start_time is not None:
-                    elapsed = now - self._fps_start_time
-                    if elapsed > 0:
-                        self._last_fps = self._fps_frame_count / elapsed
+                self._fps_timestamps.append(now)
+                # Remove timestamps outside the window
+                window_start = now - self._fps_window_seconds
+                self._fps_timestamps = [t for t in self._fps_timestamps if t >= window_start]
+                count = len(self._fps_timestamps)
+                if count > 1:
+                    duration = self._fps_timestamps[-1] - self._fps_timestamps[0]
+                    if duration > 0:
+                        self._last_fps = (count - 1) / duration
+                    else:
+                        self._last_fps = 0.0
+                else:
+                    self._last_fps = 0.0
             yield frame
 
     def get_full_stream(self) -> Generator[Tuple[Optional[List[DetectionResult]], np.ndarray], None, None]:

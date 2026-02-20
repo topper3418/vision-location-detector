@@ -22,8 +22,7 @@ def main() -> int:
     builder = ServerBuilder()
     # build the default server
     builder.initialize()
-    # get the initialized server
-    server = builder.server
+    server, video_feed = builder.build()
 
     logger.info(f"Starting web server on {settings.server_host}:{settings.server_port}...")
     try:

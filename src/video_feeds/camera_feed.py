@@ -21,10 +21,6 @@ class CameraFeed(VideoFeedBase):
         self.width = width
         self.height = height
         self.capture: Optional[cv2.VideoCapture] = None
-        # FPS tracking
-        self._frame_count = 0
-        self._fps_start_time = time.time()
-        self._current_fps = 0.0
 
     def get_jpeg_frame(self, quality: int = 90):
         """Return JPEG-encoded frame or None if not available. Accepts optional quality argument."""
@@ -58,12 +54,6 @@ class CameraFeed(VideoFeedBase):
         if self.capture is None:
             return False, None
         success, frame = self.capture.read()
-        # FPS tracking (optional, not used in base)
-        self._frame_count += 1
-        if time.time() - self._fps_start_time > 1.0:
-            self._current_fps = self._frame_count / (time.time() - self._fps_start_time)
-            self._frame_count = 0
-            self._fps_start_time = time.time()
         return success, frame
 
     def is_opened(self) -> bool:
@@ -73,11 +63,3 @@ class CameraFeed(VideoFeedBase):
         if self.capture is not None:
             self.capture.release()
             self.capture = None
-
-    def get_fps(self) -> float:
-        """Get the current frames per second.
-        FPS is calculated once per second based on actual frame capture rate.
-        Returns:
-            Current FPS as a float, or 0.0 if not yet calculated
-        """
-        return self._current_fps
