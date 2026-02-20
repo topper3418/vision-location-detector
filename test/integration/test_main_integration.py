@@ -11,9 +11,9 @@ import logging
 
 # Import dependencies to test integration
 from src.main import Application, main
-from src.camera_feed import CameraCapture
+from src.video_feeds.camera_feed import CameraCapture
 from src.server import WebServer
-from src.detector import PedestrianDetector
+from src.detection_services.pedestrian_detector import PedestrianDetector
 
 
 class TestApplicationIntegration(unittest.TestCase):

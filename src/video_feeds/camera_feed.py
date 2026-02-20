@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 import numpy as np
 import time
 
-from .video_feed_base import VideoFeedBase
+from src.interfaces.video_feed_base import VideoFeedBase
 
 class CameraFeed(VideoFeedBase):
     """Handles camera feed initialization and frame streaming."""

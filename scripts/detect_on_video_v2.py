@@ -7,6 +7,7 @@ from src.util.get_video_path import get_video_path
 from src.detection_services.pedestrian_detector import PedestrianDetector
 from src.video_feeds.spoof_video_feed import SpoofVideoFeed
 from src.interfaces.video_feed_base import VideoFeedBase
+from src.server_builder import ServerBuilder
 
 
 def main():
@@ -16,19 +17,10 @@ def main():
     print(f"Analyzing video: {video_path}")
 
     # Use spoof video feed to simulate 30 FPS video feed
-
-    detector = PedestrianDetector()
-    if not detector.initialize():
-        print("Failed to initialize detector.")
-        return
-
     video_feed: VideoFeedBase = SpoofVideoFeed(video_path)
-    if not video_feed.initialize():
-        print(f"Failed to initialize spoof video feed for video: {video_path}")
-        return
-
-    video_feed.set_detector_delegate(detector)
-    video_feed.measure_fps = True
+    builder = ServerBuilder()
+    builder.video_feed = video_feed
+    builder.initialize()  # This will initialize the video feed and detector
 
     frame_count = 0
     detection_count = 0

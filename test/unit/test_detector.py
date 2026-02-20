@@ -4,9 +4,9 @@ import unittest
 from unittest.mock import Mock, MagicMock, patch
 import numpy as np
 
-from src.detector import PedestrianDetector
-from src.video_feed_base import DetectionResult
-from src.detector_delegate import DetectorDelegate
+from src.detection_services.pedestrian_detector import PedestrianDetector
+from src.interfaces.detection_result import DetectionResult
+from src.interfaces.detector_delegate import DetectorDelegate
 
 
 class TestDetectionResult(unittest.TestCase):

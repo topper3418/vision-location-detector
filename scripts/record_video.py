@@ -5,7 +5,7 @@ import sys
 import os
 import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from src.camera_feed import CameraFeed
+from src.video_feeds.camera_feed import CameraFeed
 import os
 
 def main():

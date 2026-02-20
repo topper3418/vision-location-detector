@@ -6,7 +6,8 @@ import numpy as np
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from src.detector_delegate import DetectorDelegate, DetectionResult
+from src.interfaces.detection_result import DetectionResult
+from src.interfaces.detector_delegate import DetectorDelegate
 
 
 class VideoFeedBase(ABC):

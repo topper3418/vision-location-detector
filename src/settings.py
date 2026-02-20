@@ -73,6 +73,22 @@ class Settings:
             f"server={self.server_host}:{self.server_port})"
         )
 
+    def to_dict(self) -> dict:
+        """Return all settings as a dictionary."""
+        return {
+            'device': self.device,
+            'enable_yolo': self.enable_yolo,
+            'use_tensorrt': self.use_tensorrt,
+            'yolo_model_path': self.yolo_model_path,
+            'confidence_threshold': self.confidence_threshold,
+            'camera_id': self.camera_id,
+            'camera_width': self.camera_width,
+            'camera_height': self.camera_height,
+            'server_host': self.server_host,
+            'server_port': self.server_port,
+            'jpeg_quality': self.jpeg_quality,
+        }
+
 
 # Global settings instance
 settings = Settings()

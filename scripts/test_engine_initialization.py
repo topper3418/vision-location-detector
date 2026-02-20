@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from src.detector import PedestrianDetector
+from src.detection_services.pedestrian_detector import PedestrianDetector
 
 if __name__ == "__main__":  
     print("Testing PedestrianDetector initialization...")

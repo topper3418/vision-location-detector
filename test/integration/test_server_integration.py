@@ -13,9 +13,10 @@ from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 # Import aiohttp to test integration
 import aiohttp
+from src.interfaces.detection_result import DetectionResult
 from src.server import WebServer
-from src.camera_feed import CameraCapture
-from src.detector import PedestrianDetector, DetectionResult
+from src.video_feeds.camera_feed import CameraCapture
+from src.detection_services.pedestrian_detector import PedestrianDetector
 
 
 class TestServerIntegration(unittest.TestCase):

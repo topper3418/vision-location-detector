@@ -10,7 +10,7 @@ import numpy as np
 
 # Import cv2 to test integration
 import cv2
-from src.camera_feed import CameraCapture
+from src.video_feeds.camera_feed import CameraCapture
 
 
 class TestCameraIntegration(unittest.TestCase):

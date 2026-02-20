@@ -8,10 +8,8 @@ from typing import List, Tuple, Optional
 import numpy as np
 from ultralytics import YOLO
 
-from .detector_delegate import DetectorDelegate
-
-
-from .video_feed_base import DetectionResult
+from src.interfaces.detector_delegate import DetectorDelegate
+from src.interfaces.detection_result import DetectionResult
 
 
 class PedestrianDetector(DetectorDelegate):

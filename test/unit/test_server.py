@@ -7,8 +7,8 @@ from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 from src.server import WebServer
-from src.camera_feed import CameraCapture
-from src.detector import PedestrianDetector
+from src.video_feeds.camera_feed import CameraCapture
+from src.detection_services.pedestrian_detector import PedestrianDetector
 
 
 class TestWebServer(unittest.TestCase):
@@ -178,7 +178,7 @@ class TestWebServerAsync(AioHTTPTestCase):
     @unittest_run_loop
     async def test_handle_detections_with_data(self):
         """Test detections endpoint with detection data."""
-        from src.detector import DetectionResult
+        from src.interfaces.detection_result import DetectionResult
         
         # Add some mock detections
         det1 = DetectionResult((100.0, 100.0, 200.0, 300.0), 0.95, "Center-Mid")

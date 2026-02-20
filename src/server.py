@@ -8,11 +8,9 @@ from aiohttp import web
 from typing import Optional, List
 import os
 import cv2
-import json
 
-from src.camera_feed import CameraFeed
-from src.video_feed_base import VideoFeedBase
-from src.detector import DetectionResult
+from src.interfaces.video_feed_base import VideoFeedBase
+from src.interfaces.detection_result import DetectionResult
 from src.settings import settings
 
 
@@ -82,12 +80,9 @@ class WebServer:
             'index.html'
         )
         
-        try:
-            with open(html_path, 'r') as f:
-                html_content = f.read()
-            return web.Response(text=html_content, content_type='text/html')
-        except FileNotFoundError:
-            return web.Response(text='Index page not found', status=404)
+        with open(html_path, 'r') as f:
+            html_content = f.read()
+        return web.Response(text=html_content, content_type='text/html')
     
     async def handle_stream(self, request: web.Request) -> web.StreamResponse:
         """Handle video stream request.
@@ -118,6 +113,7 @@ class WebServer:
         try:
             # Use the video feed's full stream (yields (data, processed) tuples)
             for data, processed in self.video_feed.get_full_stream():
+                print("STREAMING FRAME WITH DETECTIONS:", data)
                 # If data is a list of detections, update latest_detections
                 if isinstance(data, list) and data and hasattr(data[0], 'to_dict'):
                     self.latest_detections = data
@@ -153,14 +149,12 @@ class WebServer:
         """
         # Check if detector is enabled
         detector_enabled = bool(self.video_feed and self.video_feed.detection_delegate)
-        
         detections_data = {
             'enabled': detector_enabled,
             'count': len(self.latest_detections),
             'detections': [det.to_dict() for det in self.latest_detections],
             'timestamp': asyncio.get_event_loop().time()
         }
-        
         return web.json_response(detections_data)
     
     async def handle_fps(self, request: web.Request) -> web.Response:
@@ -185,29 +179,14 @@ class WebServer:
         return web.json_response(fps_data)
     
     async def handle_settings(self, request: web.Request) -> web.Response:
-        """Handle settings request.
-        
+        """
+        Handle settings request.
         Args:
             request: HTTP request object
-            
         Returns:
             JSON response with application settings
         """
-        settings_data = {
-            'device': settings.device,
-            'enable_yolo': settings.enable_yolo,
-            'use_tensorrt': settings.use_tensorrt,
-            'yolo_model_path': settings.yolo_model_path,
-            'confidence_threshold': settings.confidence_threshold,
-            'camera_id': settings.camera_id,
-            'camera_width': settings.camera_width,
-            'camera_height': settings.camera_height,
-            'server_host': settings.server_host,
-            'server_port': settings.server_port,
-            'jpeg_quality': settings.jpeg_quality
-        }
-        
-        return web.json_response(settings_data)
+        return web.json_response(settings.to_dict())
     
     def get_host(self) -> str:
         """Get server host.
