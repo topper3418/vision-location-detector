@@ -8,42 +8,13 @@ from typing import List, Tuple, Optional
 import numpy as np
 from ultralytics import YOLO
 
-
-class DetectionResult:
-    """Represents a single pedestrian detection."""
-    
-    def __init__(self, bbox: Tuple[float, float, float, float], 
-                 confidence: float, location: str):
-        """Initialize detection result.
-        
-        Args:
-            bbox: Bounding box (x1, y1, x2, y2) in pixels
-            confidence: Detection confidence score (0-1)
-            location: Approximate location description
-        """
-        self.bbox = bbox
-        self.confidence = confidence
-        self.location = location
-    
-    def to_dict(self) -> dict:
-        """Convert detection result to dictionary.
-        
-        Returns:
-            Dictionary representation of the detection
-        """
-        return {
-            'bbox': {
-                'x1': self.bbox[0],
-                'y1': self.bbox[1],
-                'x2': self.bbox[2],
-                'y2': self.bbox[3]
-            },
-            'confidence': round(self.confidence, 3),
-            'location': self.location
-        }
+from .detector_delegate import DetectorDelegate
 
 
-class PedestrianDetector:
+from .video_feed_base import DetectionResult
+
+
+class PedestrianDetector(DetectorDelegate):
     """Handles pedestrian detection using YOLO."""
     
     def __init__(self, model_path: str = 'yolov8n.pt', 
@@ -61,7 +32,6 @@ class PedestrianDetector:
         self.model_path = model_path
         self.confidence_threshold = confidence_threshold
         self.use_tensorrt = use_tensorrt
-        
         # Device selection logic
         if device is None:
             # Auto-detect: use CUDA if available, else CPU
@@ -84,156 +54,65 @@ class PedestrianDetector:
             
         self.model: Optional[YOLO] = None
         self.camera_angle: float = 60.0  # degrees downward
-        
+    
     def initialize(self) -> bool:
-        """Initialize the YOLO model. Raises on failure."""
+        """Initialize the YOLO model. Returns False on failure."""
         print(f"Initializing YOLO model on device: {self.device}")
-        self.model = YOLO(self.model_path, task='detect')
-        # Export to TensorRT for Jetson acceleration if requested and CUDA is available
-        if self.use_tensorrt and self.model is not None and self.device == 'cuda':
-            import os
-            engine_path = self.model_path.replace('.pt', '.engine')
-            if os.path.exists(engine_path):
-                print(f"Found existing TensorRT engine: {engine_path}. Loading...")
-                self.model = YOLO(engine_path)
-                print("TensorRT model loaded successfully")
-            else:
-                print("TensorRT engine not found. Exporting...")
-                self.model.export(format='engine', half=True, device=self.device)
-                self.model = YOLO(engine_path)
-                print("TensorRT model exported and loaded successfully")
-        elif self.use_tensorrt and self.device != 'cuda':
-            raise RuntimeError("TensorRT requested but CUDA not available. Aborting.")
-        print(f"YOLO model initialized successfully on {self.device}")
-        return True
+        try:
+            self.model = YOLO(self.model_path, task='detect')
+            # Export to TensorRT for Jetson acceleration if requested and CUDA is available
+            if self.use_tensorrt and self.model is not None and self.device == 'cuda':
+                import os
+                engine_path = self.model_path.replace('.pt', '.engine')
+                if os.path.exists(engine_path):
+                    print(f"Found existing TensorRT engine: {engine_path}. Loading...")
+                    self.model = YOLO(engine_path)
+                    print("TensorRT model loaded successfully")
+                else:
+                    print("TensorRT engine not found. Exporting...")
+                    self.model.export(format='engine', half=True, device=self.device)
+                    self.model = YOLO(engine_path)
+                    print("TensorRT model exported and loaded successfully")
+            elif self.use_tensorrt and self.device != 'cuda':
+                raise RuntimeError("TensorRT requested but CUDA not available. Aborting.")
+            print(f"YOLO model initialized successfully on {self.device}")
+            return True
+        except Exception as e:
+            print(f"YOLO initialization failed: {e}")
+            self.model = None
+            return False
     
     def detect(self, frame: np.ndarray) -> List[DetectionResult]:
-        """Detect pedestrians in a frame.
-        
-        Args:
-            frame: Input image as numpy array (BGR format)
-            
-        Returns:
-            List of DetectionResult objects
-        """
+        """Detect pedestrians in a frame and return DetectionResult list."""
         if self.model is None:
             raise RuntimeError("YOLO model is not initialized. Aborting.")
-        
-        # Run YOLO detection with optimized settings
-        # Use half precision (FP16) only on GPU for speed
-        # imgsz=640 for balanced speed/accuracy
-        use_half = self.device != 'cpu'
-        print(f"Running detection on device: {self.device}, half precision: {use_half}")
-        
-        expected_size = (640, 640)
-        if frame.shape[0:2] != expected_size:
-            import cv2
-            frame = cv2.resize(frame, expected_size[::-1])
-        # Remove device argument for inference (TensorRT engine is already bound to device)
-        results = self.model(frame, verbose=False, imgsz=640, half=use_half)
-        
-        detections = []
-        
-        # Process results
+        results = self.model(frame)
+        detections: List[DetectionResult] = []
         for result in results:
-            boxes = result.boxes
-            
-            for box in boxes:
-                # Get class ID and filter for person class (class 0 in COCO)
-                class_id = int(box.cls[0])
-                if class_id != 0:  # 0 is the person class in COCO dataset
+            for box in getattr(result, 'boxes', []):
+                # Only keep person class (class 0)
+                if hasattr(box, 'cls') and box.cls[0] != 0:
                     continue
-                
-                # Get confidence
-                confidence = float(box.conf[0])
-                if confidence < self.confidence_threshold:
+                conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
+                if conf < self.confidence_threshold:
                     continue
-                
-                # Get bounding box coordinates
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                bbox = (float(x1), float(y1), float(x2), float(y2))
-                
-                # Calculate approximate location
-                # Ensure frame.shape is a 3-tuple (height, width, channels)
-                shape = frame.shape if len(frame.shape) == 3 else (frame.shape[0], frame.shape[1], 1)
-                location = self._calculate_location(bbox, shape)
-                
-                detections.append(DetectionResult(bbox, confidence, location))
-        
+                xyxy = box.xyxy[0].cpu().numpy() if hasattr(box, 'xyxy') else [0, 0, 0, 0]
+                bbox = (float(xyxy[0]), float(xyxy[1]), float(xyxy[2]), float(xyxy[3]))
+                detections.append(DetectionResult(bbox, conf, label="person"))
         return detections
-    
-    def _calculate_location(self, bbox: Tuple[float, float, float, float], 
-                           frame_shape: Tuple[int, int, int]) -> str:
-        """Calculate approximate location of detected person.
-        
-        Given that the camera is angled 60 degrees downward, we can estimate
-        the person's location relative to the camera based on their position
-        in the frame.
-        
-        Args:
-            bbox: Bounding box (x1, y1, x2, y2)
-            frame_shape: Frame dimensions (height, width, channels)
-            
-        Returns:
-            String description of location (e.g., "Center-Near", "Left-Far")
-        """
-        x1, y1, x2, y2 = bbox
-        height, width = frame_shape[:2]
-        
-        # Calculate center of bounding box
-        center_x = (x1 + x2) / 2
-        center_y = (y1 + y2) / 2
-        
-        # Determine horizontal position (Left, Center, Right)
-        if center_x < width / 3:
-            horizontal = "Left"
-        elif center_x < 2 * width / 3:
-            horizontal = "Center"
-        else:
-            horizontal = "Right"
-        
-        # Determine depth/distance (Near, Mid, Far)
-        # With camera angled downward, objects higher in frame are farther away
-        if center_y > 2 * height / 3:
-            depth = "Near"
-        elif center_y > height / 3:
-            depth = "Mid"
-        else:
-            depth = "Far"
-        
-        return f"{horizontal}-{depth}"
-    
-    def draw_detections(self, frame: np.ndarray, 
-                       detections: List[DetectionResult]) -> np.ndarray:
-        """Draw detection boxes and labels on frame.
-        
-        Args:
-            frame: Input image as numpy array
-            detections: List of DetectionResult objects
-            
-        Returns:
-            Frame with drawn detections
-        """
+
+    def draw_detections(self, frame: np.ndarray, detections: List[DetectionResult]) -> np.ndarray:
+        """Draw detection boxes and labels on frame."""
         import cv2
-        
         frame_copy = frame.copy()
-        
         for detection in detections:
             x1, y1, x2, y2 = detection.bbox
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-            
-            # Draw bounding box
             cv2.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
-            # Draw label with confidence and location
-            label = f"{detection.location} ({detection.confidence:.2f})"
-            
-            # Get text size for background
+            label = f"{detection.label} ({detection.confidence:.2f})"
             (text_width, text_height), baseline = cv2.getTextSize(
                 label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
             )
-            
-            # Draw background rectangle for text
             cv2.rectangle(
                 frame_copy,
                 (x1, y1 - text_height - baseline - 5),
@@ -241,8 +120,6 @@ class PedestrianDetector:
                 (0, 255, 0),
                 -1
             )
-            
-            # Draw text
             cv2.putText(
                 frame_copy,
                 label,
@@ -252,10 +129,8 @@ class PedestrianDetector:
                 (0, 0, 0),
                 1
             )
-        
         return frame_copy
     
     def release(self) -> None:
-        """Release resources."""
-        # YOLO model doesn't require explicit cleanup
+        """Release any resources held by the detector."""
         self.model = None

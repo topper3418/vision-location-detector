@@ -10,7 +10,7 @@ import os
 import cv2
 import json
 
-from src.camera import CameraFeed
+from src.camera_feed import CameraFeed
 from src.video_feed_base import VideoFeedBase
 from src.detector import DetectionResult
 from src.settings import settings
@@ -41,14 +41,13 @@ class WebServer:
         self.app: Optional[web.Application] = None
         self.video_feed: Optional[VideoFeedBase] = None
         self.latest_detections: List[DetectionResult] = []
+        self.processor = None  # DetectionProcessor
 
     # Detection loop is now handled by the video feed's postprocessing pipeline
     
     def set_video_feed(self, video_feed: VideoFeedBase) -> None:
         """Set the video feed instance (supports any VideoFeedBase subclass)."""
         self.video_feed = video_feed
-    
-    # Detector is now a postprocessor in the video feed pipeline
     
     def create_app(self) -> web.Application:
         """Create and configure the aiohttp application.
@@ -153,7 +152,7 @@ class WebServer:
             JSON response with current detection results
         """
         # Check if detector is enabled
-        detector_enabled = bool(self.video_feed and self.video_feed.postprocessors)
+        detector_enabled = bool(self.video_feed and self.video_feed.detection_delegate)
         
         detections_data = {
             'enabled': detector_enabled,
@@ -173,10 +172,10 @@ class WebServer:
         Returns:
             JSON response with current FPS
         """
-        if self.video_feed is None:
+        if self.video_feed is None or not self.video_feed.is_opened() or not self.video_feed.measure_fps:
             fps = 0.0
         else:
-            fps = self.video_feed.get_fps() if hasattr(self.video_feed, 'get_fps') else 0.0
+            fps = self.video_feed.fps
         
         fps_data = {
             'fps': round(fps, 1),
@@ -231,6 +230,8 @@ class WebServer:
         if self.app is None:
             self.create_app()
         
+        if self.app is None:
+            raise RuntimeError("Application not created. Cannot start server.")
         runner = web.AppRunner(self.app)
         await runner.setup()
         
@@ -240,9 +241,10 @@ class WebServer:
     def run(self) -> None:
         """Run the web server (blocking).
         
-        This is a convenience method that creates the app and runs it.
+        Raises:
+            RuntimeError: If application is not created before running
         """
         if self.app is None:
-            self.create_app()
+            raise RuntimeError("Application not created. Call create_app() before run().")
         
         web.run_app(self.app, host=self.host, port=self.port)

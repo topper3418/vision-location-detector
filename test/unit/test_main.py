@@ -36,7 +36,7 @@ class TestApplication(unittest.TestCase):
         self.assertIsNotNone(self.app.logger)
         self.assertIsInstance(self.app.logger, logging.Logger)
     
-    @patch('src.main.CameraCapture')
+    @patch('src.camera.CameraFeed')
     def test_initialize_camera_success(self, mock_camera_class):
         """Test successful camera initialization."""
         mock_camera = Mock()
@@ -50,7 +50,7 @@ class TestApplication(unittest.TestCase):
         mock_camera.initialize.assert_called_once()
         self.assertEqual(self.app.camera, mock_camera)
     
-    @patch('src.main.CameraCapture')
+    @patch('src.camera.CameraFeed')
     def test_initialize_camera_failure(self, mock_camera_class):
         """Test failed camera initialization."""
         mock_camera = Mock()

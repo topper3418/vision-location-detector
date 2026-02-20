@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 import numpy as np
 
-from src.camera import CameraCapture
+from src.camera_feed import CameraCapture
 
 
 class TestCameraCapture(unittest.TestCase):

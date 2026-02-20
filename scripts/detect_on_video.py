@@ -51,26 +51,18 @@ def main():
     print(f"Analyzing video: {video_path}")
 
     # Use spoof video feed to simulate 30 FPS video feed
-    video_feed: VideoFeedBase = SpoofVideoFeed(video_path)
-    if not video_feed.initialize():
-        print(f"Failed to initialize spoof video feed for video: {video_path}")
-        return
 
     detector = PedestrianDetector()
     if not detector.initialize():
         print("Failed to initialize detector.")
         return
 
+    video_feed: VideoFeedBase = SpoofVideoFeed(video_path)
+    if not video_feed.initialize():
+        print(f"Failed to initialize spoof video feed for video: {video_path}")
+        return
 
-    # Add detection as a postprocessor to the video feed
-    def detection_postprocessor(frame):
-        import cv2
-        print(f"[DEBUG] Frame shape: {frame.shape}, dtype: {frame.dtype}")
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        detections = detector.detect(rgb_frame)
-        annotated = detector.draw_detections(frame, detections)
-        return (annotated, detections)
-    video_feed.add_postprocessor(detection_postprocessor)
+    video_feed.set_detector_delegate(detector)
 
     frame_count = 0
     detection_count = 0
@@ -90,7 +82,7 @@ def main():
         if frame_count % 30 == 0:
             elapsed = time.time() - start_time
             actual_fps = frame_count / elapsed if elapsed > 0 else 0
-            print(f"Frame {frame_count}: {len(detections)} detection(s) | Actual FPS: {actual_fps:.1f}")
+            print(f"Frame {frame_count}: {len(detections) if detections else 0} detection(s) | Actual FPS: {actual_fps:.1f}")
 
     video_feed.release()
 

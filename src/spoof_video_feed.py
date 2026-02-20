@@ -5,6 +5,8 @@ import cv2
 import time
 from .video_feed_base import VideoFeedBase
 
+from .video_feed_base import DetectorDelegate
+
 class SpoofVideoFeed(VideoFeedBase):
     """Simulates a video feed by reading from video file at exactly 30 FPS."""
     def __init__(self, video_path: str):

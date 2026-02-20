@@ -4,7 +4,9 @@ import unittest
 from unittest.mock import Mock, MagicMock, patch
 import numpy as np
 
-from src.detector import PedestrianDetector, DetectionResult
+from src.detector import PedestrianDetector
+from src.video_feed_base import DetectionResult
+from src.detector_delegate import DetectorDelegate
 
 
 class TestDetectionResult(unittest.TestCase):
@@ -45,7 +47,7 @@ class TestPedestrianDetector(unittest.TestCase):
     def test_init_default(self):
         """Test detector initialization with default parameters."""
         detector = PedestrianDetector()
-        
+        self.assertIsInstance(detector, DetectorDelegate)
         self.assertEqual(detector.model_path, 'yolov8n.pt')
         self.assertEqual(detector.confidence_threshold, 0.5)
         self.assertTrue(detector.use_tensorrt)
@@ -107,6 +109,7 @@ class TestPedestrianDetector(unittest.TestCase):
     def test_detect_raises_when_no_model(self):
         """Test detect raises RuntimeError when model not initialized."""
         detector = PedestrianDetector()
+        self.assertIsInstance(detector, DetectorDelegate)
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
         with self.assertRaises(RuntimeError):
             detector.detect(frame)

@@ -13,8 +13,6 @@ import time
 
 from .video_feed_base import VideoFeedBase
 
-
-
 class CameraFeed(VideoFeedBase):
     """Handles camera feed initialization and frame streaming."""
     def __init__(self, camera_id: int = 0, width: int = 640, height: int = 480):
@@ -27,6 +25,20 @@ class CameraFeed(VideoFeedBase):
         self._frame_count = 0
         self._fps_start_time = time.time()
         self._current_fps = 0.0
+
+    def get_jpeg_frame(self, quality: int = 90):
+        """Return JPEG-encoded frame or None if not available. Accepts optional quality argument."""
+        if self.capture is None or not self.capture.isOpened():
+            return None
+        success, frame = self.read_frame()
+        if not success or frame is None:
+            return None
+        import cv2
+        encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        success, buffer = cv2.imencode('.jpg', frame, encode_params)
+        if not success:
+            return None
+        return buffer.tobytes()
 
     def initialize(self) -> bool:
         self.capture = cv2.VideoCapture(self.camera_id)

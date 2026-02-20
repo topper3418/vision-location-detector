@@ -7,7 +7,7 @@ from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 from src.server import WebServer
-from src.camera import CameraCapture
+from src.camera_feed import CameraCapture
 from src.detector import PedestrianDetector
 
 

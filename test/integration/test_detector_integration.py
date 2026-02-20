@@ -7,7 +7,8 @@ import unittest
 from unittest.mock import Mock, MagicMock, patch
 import numpy as np
 
-from src.detector import PedestrianDetector, DetectionResult
+from src.detector import PedestrianDetector
+from src.video_feed_base import DetectionResult, DetectorDelegate
 
 
 class TestPedestrianDetectorIntegration(unittest.TestCase):
@@ -20,10 +21,11 @@ class TestPedestrianDetectorIntegration(unittest.TestCase):
         mock_yolo_class.return_value = mock_model
         
         detector = PedestrianDetector(use_tensorrt=False)
+        from src.detector_delegate import DetectorDelegate as TrueDetectorDelegate
+        self.assertIsInstance(detector, TrueDetectorDelegate)
         result = detector.initialize()
-        
         self.assertTrue(result)
-        mock_yolo_class.assert_called_once_with('yolov8n.pt')
+        mock_yolo_class.assert_called_once_with('yolov8n.pt', task='detect')
         self.assertEqual(detector.model, mock_model)
     
     @patch('src.detector.YOLO')
