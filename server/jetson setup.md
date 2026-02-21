@@ -76,3 +76,42 @@ is needed for some of the exports.
 ```bash
 pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.23.0-cp310-cp310-linux_aarch64.whl
 ```
+
+## Initializing application
+
+Now it's time to install this repo onto the Jetson and get it running. 
+
+1. If you haven't already done so, clone and enter this repository (user's root 
+directory is fine, doesn't really matter)
+
+```bash
+cd
+git clone https://github.com/topper3418/vision-location-detector.git
+cd vision-location-detector
+```
+
+2. Activate and set up virtual environment
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+3. copy example.env to .env to use the example configuration
+
+```bash
+cp example.env .env
+```
+
+4. Run for the first time to test and to initialize the engine that cuda will use
+
+```bash
+./run.sh
+```
+
+-or-
+
+```bash
+python -m src.main
+```

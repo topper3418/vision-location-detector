@@ -58,3 +58,4 @@ Thumbs.db
 
 # TensorRT engine files
 *.engine
+*.onnx
