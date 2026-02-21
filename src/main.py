@@ -22,7 +22,15 @@ def main() -> int:
     builder = ServerBuilder()
     # build the default server
     builder.initialize()
-    server, video_feed = builder.build()
+    server, _ = builder.build()
+
+    if server is None:
+        logger.error("Failed to build server. Exiting.")
+        return 1
+
+    if server.video_feed is None:
+        logger.error("Server has no video feed. Exiting.")
+        return 1
 
     logger.info(f"Starting web server on {settings.server_host}:{settings.server_port}...")
     try:
@@ -35,7 +43,8 @@ def main() -> int:
         logger.error(f"Exception occurred: {e}")
         return 1
     finally:
-        server.video_feed.release()
+        if server.video_feed is not None:
+            server.video_feed.release()
 
 
 if __name__ == '__main__':
