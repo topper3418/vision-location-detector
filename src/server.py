@@ -80,7 +80,7 @@ class WebServer:
             'index.html'
         )
         
-        with open(html_path, 'r') as f:
+        with open(html_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
         return web.Response(text=html_content, content_type='text/html')
     

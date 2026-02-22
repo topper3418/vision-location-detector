@@ -34,7 +34,7 @@ sudo apt install python3-pip -y
 pip install -U pip
 ```
 
-2. install the ultralytics package globally
+2. install the ultralytics package globally DEPRECATED TO APP SETUP
 
 ```bash
 pip install ultralytics[export]
@@ -46,7 +46,7 @@ pip install ultralytics[export]
 sudo reboot
 ```
 
-4. Install PyTorch and Torchvision
+4. Install PyTorch and Torchvision  DEPRECATED TO APP SETUP STEP
 
 The above ultralytics installation will install Torch and Torchvision. However, 
 these two packages installed via pip are not compatible with the Jetson platform, 
@@ -93,8 +93,26 @@ cd vision-location-detector
 2. Activate and set up virtual environment
 
 ```bash
-python -m venv venv
+python -m venv venv --system-site-packages
+# Activate venv
 source venv/bin/activate
+
+# Install the Jetson-specific wheels INSIDE the venv (these provide GPU accel)
+pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torch-2.5.0a0+872d972e41.nv24.08-cp310-cp310-linux_aarch64.whl
+pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl
+
+# onnxruntime-gpu for exports
+pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.23.0-cp310-cp310-linux_aarch64.whl
+
+# Then ultralytics (with export extras)
+pip install -U ultralytics[export]
+
+# also consider installing uv for this
+# or try doing it more lightweight, might save time
+pip install -U ultralytics  # Base install – quick, no big extras
+pip install onnx onnxslim   # Enough for ONNX → TensorRT export on Jetson
+
+# Install other project deps
 pip install -r requirements.txt
 ```
 

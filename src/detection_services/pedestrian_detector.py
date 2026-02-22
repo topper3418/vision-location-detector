@@ -58,20 +58,56 @@ class PedestrianDetector(DetectorDelegate):
         print(f"Initializing YOLO model on device: {self.device}")
         try:
             self.model = YOLO(self.model_path, task='detect')
-            # Export to TensorRT for Jetson acceleration if requested and CUDA is available
-            if self.use_tensorrt and self.model is not None and self.device == 'cuda':
+            
+            if self.use_tensorrt:
+                if self.device != 'cuda':
+                    raise RuntimeError(
+                        "TensorRT acceleration requested, but CUDA is not available. "
+                        "Cannot proceed without GPU. Aborting."
+                    )
+                
+                # Double-check CUDA (redundant but explicit)
+                import torch
+                if not (hasattr(torch, 'cuda') and torch.cuda.is_available()):
+                    raise RuntimeError(
+                        "TensorRT acceleration is requested, but no CUDA device is available. "
+                        "Cannot continue without GPU acceleration."
+                    )
+                
                 import os
                 engine_path = self.model_path.replace('.pt', '.engine')
+                
                 if not os.path.exists(engine_path):
-                    print("TensorRT engine not found. Exporting...")
-                    self.model.export(format='engine', half=True, device=self.device)
-                    print("TensorRT model exported successfully")
+                    print("TensorRT engine not found. Exporting with FP16 (this may take several minutes)...")
+                    exported = self.model.export(
+                        format='engine',
+                        half=True,                # FP16 mandatory for best Jetson performance
+                        device=0,                 # Explicit GPU (index 0)
+                        imgsz=640,                # Fixed input size; change if your camera needs different
+                        workspace=4,              # 4 GB workspace — increase to 6–8 if you get OOM
+                        simplify=True,            # ONNX slimming (usually safe and beneficial)
+                        verbose=True              # Helpful debug output during export
+                    )
+                    print(f"TensorRT engine exported to: {exported}")
+                    engine_path = exported  # Ultralytics returns the actual path used
+                
+                # Load the engine — this must succeed
                 self.model = YOLO(engine_path, task='detect', verbose=False)
-                print("TensorRT model loaded successfully")
-            elif self.use_tensorrt and self.device != 'cuda':
-                raise RuntimeError("TensorRT requested but CUDA not available. Aborting.")
+                print("TensorRT engine loaded successfully")
+            
+            # No else block needed — if not use_tensorrt, we just use the .pt model on whatever device was selected
+            # (You can add a print here if you want visibility)
+            if not self.use_tensorrt:
+                print(f"TensorRT disabled — using native model on {self.device}")
+            
             print(f"YOLO model initialized successfully on {self.device}")
             return True
+        
+        except Exception as e:
+            print(f"YOLO initialization failed: {e}")
+            self.model = None
+            return False
+        
         except Exception as e:
             print(f"YOLO initialization failed: {e}")
             self.model = None
@@ -81,13 +117,15 @@ class PedestrianDetector(DetectorDelegate):
         """Detect pedestrians in a frame and return DetectionResult list."""
         if self.model is None:
             raise RuntimeError("YOLO model is not initialized. Aborting.")
-        results = self.model(frame, verbose=False)
+        results = self.model(
+            frame, 
+            verbose=False,
+            classes=[0],  # Only detect person class (class 0)
+            conf=self.confidence_threshold,
+            )
         detections: List[DetectionResult] = []
         for result in results:
             for box in getattr(result, 'boxes', []):
-                # Only keep person class (class 0)
-                if hasattr(box, 'cls') and box.cls[0] != 0:
-                    continue
                 conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
                 if conf < self.confidence_threshold:
                     continue
