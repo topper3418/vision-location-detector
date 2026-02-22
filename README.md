@@ -85,38 +85,23 @@ Key rules:
 
 ## Installation & Setup
 
+
 ### Requirements
+
 - Python 3.8+
 - Camera device (USB or CSI)
 - For Jetson: CUDA-enabled OpenCV, TensorRT (optional)
 
 ### Setup
-1. Clone the repository:
-	```bash
-	git clone <repo-url>
-	cd vision-location-detector
-	```
-2. (Recommended) Create and activate a virtual environment:
-	```bash
-	python3 -m venv venv
-	source venv/bin/activate
-	```
-3. Install dependencies:
-	```bash
-	pip install -r requirements.txt
-	```
-4. Copy and edit `.env` for configuration:
-	```bash
-	cp example.env .env
-	# Edit .env as needed (see CONFIG.md for options)
-	```
 
+Please refer to server/jetson_setup.md for instructions on a Jetson
 
-## Usage
 
 ### Running the Application
 
-Start the server (loads settings from `.env`):
+Start the server (loads settings from `.env`, be sure to copy from example.env and 
+configure to suit your use case):
+
 ```bash
 python -m src.main
 ```

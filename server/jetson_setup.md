@@ -15,19 +15,21 @@ two installed.
 
 2. Use Balena Etcher to flash onto a suitable microSD card
 
-3. Update the firmware
+3. Insert the SD card to the Jetson, power it on, and follow the onscreen 
+prompts to set up the machine (you'll need a monitor, keyboard and mouse)
+
+4. Update all software packages and reboot
+
 ```bash
-sudo apt update && sudo apt upgrade -y
+sudo apt update && sudo apt upgrade -y && sudo reboot
 ```
 
-## Installing global dependencies
+## Installing dependencies
 
 Not all default pip repos are configured to properly utilize the jetson's
-GPU to its fullest potential. These installs will greatly improve performance. 
-The following is from [Ultralytic's quick start guide](https://docs.ultralytics.com/guides/nvidia-jetson/#install-pytorch-and-torchvision_1)
-
-There is a script that installs all required non-venv dependencies. For details,
-read the comments in the script
+GPU to its fullest potential, thus the dependency install process is quite 
+complicated. Thus, scripts have been written to simplify the process and 
+ensure consistent installs
 
 1. Navigate to the project directory
 
@@ -35,16 +37,13 @@ read the comments in the script
 cd vision-location-detector
 ```
 
-2. Run the script
+2. Run the external dependency script
 
 ```bash
 ./server/install_external_deps.sh
 ```
 
-## Initializing application
-
-There is a script that initializes and enters venv, and installs all required
-dependencies within it. 
+3. run the internal dependency script
 
 ```bash
 ./scripts/install_internal_deps.sh
