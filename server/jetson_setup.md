@@ -26,110 +26,26 @@ Not all default pip repos are configured to properly utilize the jetson's
 GPU to its fullest potential. These installs will greatly improve performance. 
 The following is from [Ultralytic's quick start guide](https://docs.ultralytics.com/guides/nvidia-jetson/#install-pytorch-and-torchvision_1)
 
-1. install and update pip
+There is a script that installs all required non-venv dependencies. For details,
+read the comments in the script
+
+1. Navigate to the project directory
 
 ```bash
-sudo apt update
-sudo apt install python3-pip -y
-pip install -U pip
+cd vision-location-detector
 ```
 
-2. install the ultralytics package globally DEPRECATED TO APP SETUP
+2. Run the script
 
 ```bash
-pip install ultralytics[export]
-```
-
-3. reboot the machine
-
-```bash
-sudo reboot
-```
-
-4. Install PyTorch and Torchvision  DEPRECATED TO APP SETUP STEP
-
-The above ultralytics installation will install Torch and Torchvision. However, 
-these two packages installed via pip are not compatible with the Jetson platform, 
-which is based on ARM64 architecture. Therefore, we need to manually install 
-a pre-built PyTorch pip wheel and compile or install Torchvision from source.
-
-```bash
-pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torch-2.5.0a0+872d972e41.nv24.08-cp310-cp310-linux_aarch64.whl
-pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl
-```
-
-5. Install cuSPARSELt to fix a dependency issue with torch 2.5.0
-
-```bash
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/arm64/cuda-keyring_1.1-1_all.deb
-sudo dpkg -i cuda-keyring_1.1-1_all.deb
-sudo apt-get update
-sudo apt-get -y install libcusparselt0 libcusparselt-dev
-```
-
-6. Install onnxruntime-gpu
-
-The onnxruntime-gpu package hosted in PyPI does not have aarch64 binaries 
-for the Jetson. So we need to manually install this package. This package 
-is needed for some of the exports.
-
-```bash
-pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.23.0-cp310-cp310-linux_aarch64.whl
+./server/install_external_deps.sh
 ```
 
 ## Initializing application
 
-Now it's time to install this repo onto the Jetson and get it running. 
-
-1. If you haven't already done so, clone and enter this repository (user's root 
-directory is fine, doesn't really matter)
+There is a script that initializes and enters venv, and installs all required
+dependencies within it. 
 
 ```bash
-cd
-git clone https://github.com/topper3418/vision-location-detector.git
-cd vision-location-detector
-```
-
-2. Activate and set up virtual environment
-
-```bash
-python -m venv venv --system-site-packages
-# Activate venv
-source venv/bin/activate
-
-# Install the Jetson-specific wheels INSIDE the venv (these provide GPU accel)
-pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torch-2.5.0a0+872d972e41.nv24.08-cp310-cp310-linux_aarch64.whl
-pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl
-
-# onnxruntime-gpu for exports
-pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.23.0-cp310-cp310-linux_aarch64.whl
-
-# Then ultralytics (with export extras)
-pip install -U ultralytics[export]
-
-# also consider installing uv for this
-# or try doing it more lightweight, might save time
-pip install -U ultralytics  # Base install – quick, no big extras
-pip install onnx onnxslim   # Enough for ONNX → TensorRT export on Jetson
-
-# Install other project deps
-pip install -r requirements.txt
-```
-
-3. copy example.env to .env to use the example configuration
-
-```bash
-cp example.env .env
-```
-
-4. Run for the first time to test and to initialize the engine that cuda will use
-
-```bash
-./run.sh
-```
-
--or-
-
-```bash
-python -m src.main
+./scripts/install_internal_deps.sh
 ```
